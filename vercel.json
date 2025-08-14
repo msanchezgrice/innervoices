@@ -1,0 +1,13 @@
+{
+  "framework": "vite",
+  "installCommand": "cd innervoices && npm install",
+  "buildCommand": "cd innervoices && npm run build",
+  "devCommand": "cd innervoices && npm run dev",
+  "outputDirectory": "innervoices/dist",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
