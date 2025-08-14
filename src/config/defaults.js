@@ -29,6 +29,13 @@ export const DEFAULT_CONFIG = {
   maxTokens: 10000, // default output token limit
   allowToolCalling: true, // enable LLM tool-calling schema (future tools can hook in)
 
+  // Ship Mode (encouraging, direct, action-focused)
+  shipModeEnabled: true, // default ON
+  shipModeIntensity: "encouraging", // gentle | encouraging | direct
+  detectPatterns: true, // detect procrastination patterns
+  trackCommitments: true, // remember user's stated commitments
+  escalateOnInaction: true, // gently escalate tone if no action taken
+
   // AI Behavior
   commentProbability: 0.3, // 0-1, chance of commenting
   maxCommentLength: 200, // words (post-truncation safety)

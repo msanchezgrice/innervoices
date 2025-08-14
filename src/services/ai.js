@@ -1,4 +1,4 @@
-import { buildPrompt } from "../config/prompts";
+import { buildPrompt, buildSystemPrompt } from "../config/prompts";
 import { detectContext } from "../utils/detectContext";
 
 // Env fallbacks
@@ -14,10 +14,8 @@ function truncateWords(text, maxWords) {
 }
 
 function getSystemPrompt(config) {
-  return (
-    config?.systemPrompt ||
-    "You produce short, timely ambient commentary for a writer. Keep it helpful, warm, and concise."
-  );
+  // Prefer ShipMode system prompt when enabled; falls back internally if disabled
+  return buildSystemPrompt(config);
 }
 
 function getOpenAIConfig(config = {}) {

@@ -315,6 +315,54 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Ship Mode */}
+      <div className="mb-6">
+        <div className="font-semibold mb-2">Ship Mode</div>
+        <label className="flex items-center gap-2 mb-3">
+          <input
+            type="checkbox"
+            checked={config.shipModeEnabled !== false}
+            onChange={(e) => updateConfig({ shipModeEnabled: e.target.checked })}
+          />
+          <span className="text-sm">Enable Ship Mode (encouraging, action-focused)</span>
+        </label>
+
+        {config.shipModeEnabled !== false && (
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Intensity</label>
+              <select
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                value={config.shipModeIntensity || "encouraging"}
+                onChange={(e) => updateConfig({ shipModeIntensity: e.target.value })}
+              >
+                <option value="gentle">Gentle</option>
+                <option value="encouraging">Encouraging</option>
+                <option value="direct">Direct</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={!!config.escalateOnInaction}
+                onChange={(e) => updateConfig({ escalateOnInaction: e.target.checked })}
+              />
+              <span className="text-sm">Gently escalate if no action taken</span>
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={!!config.trackCommitments}
+                onChange={(e) => updateConfig({ trackCommitments: e.target.checked })}
+              />
+              <span className="text-sm">Remember my commitments</span>
+            </label>
+          </div>
+        )}
+      </div>
+
       {/* Use Cases */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2">
