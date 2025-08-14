@@ -1,9 +1,9 @@
 {
   "framework": "vite",
   "installCommand": "cd innervoices && npm install",
-  "buildCommand": "cd innervoices && npm run build && rm -rf ../dist && mv dist ../dist",
+  "buildCommand": "cd innervoices && npm run build",
   "devCommand": "cd innervoices && npm run dev",
-  "outputDirectory": "dist",
+  "outputDirectory": "innervoices/dist",
   "routes": [
     {
       "src": "/(.*)",
