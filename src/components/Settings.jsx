@@ -238,7 +238,7 @@ export default function Settings() {
             <label className="block text-sm font-medium mb-1">OpenAI Model</label>
             <select
               className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-              value={config.openaiModel || "gpt-4o-mini"}
+              value={config.openaiModel || "gpt-5-mini"}
               onChange={(e) => updateConfig({ openaiModel: e.target.value })}
             >
               {OPENAI_MODELS.map((m) => (
@@ -296,7 +296,7 @@ export default function Settings() {
               min={60}
               max={50000}
               className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-              value={config.maxTokens ?? 5000}
+              value={config.maxTokens ?? 25000}
               onChange={(e) =>
                 updateConfig({ maxTokens: Number(e.target.value) })
               }

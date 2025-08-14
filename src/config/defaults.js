@@ -11,21 +11,22 @@ export const DEFAULT_CONFIG = {
   voiceName: "", // optional browser voice name; empty = auto-pick best
 
   // TTS Provider
-  ttsProvider: "browser", // "browser" | "elevenlabs"
-  elevenlabsApiKey: "",
+  ttsProvider: "elevenlabs", // "browser" | "elevenlabs"
+  elevenlabsApiKey: (import.meta.env.VITE_ELEVENLABS_API_KEY || import.meta.env.ELEVEN_LABS_API_KEY || ""),
   elevenlabsVoiceId: "",
+  elevenlabsVoiceName: "Michael C Vincent",
 
   // AI Provider & Models
   aiProvider: "openai", // "openai" | "anthropic"
-  openaiApiKey: "",
+  openaiApiKey: (import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY || ""),
   anthropicApiKey: "",
-  openaiModel: "gpt-4o-mini",
+  openaiModel: "gpt-5-mini",
   anthropicModel: "claude-3-5-sonnet-latest",
 
   // AI system prompt and verbosity
   systemPrompt:
     "You produce timely ambient commentary for a writer. Be helpful, warm, and constructive. Provide 2–4 concise sentences unless the user content strongly suggests otherwise.",
-  maxTokens: 5000, // allow more verbose commentary by default
+  maxTokens: 25000, // allow more verbose commentary by default
   allowToolCalling: true, // enable LLM tool-calling schema (future tools can hook in)
 
   // AI Behavior

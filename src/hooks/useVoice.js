@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { pickBestVoice } from "./useVoices.js";
 import { speakWithElevenLabs } from "../services/tts/elevenlabs.js";
+import { listElevenLabsVoices } from "../services/tts/elevenlabsApi.js";
+import { useConfigStore } from "../store/useConfigStore.js";
 
 /**
  * Browser SpeechSynthesis wrapper.
@@ -26,36 +28,54 @@ export function useVoice(config, { onStart, onEnd } = {}) {
     if (!text || !config?.voiceEnabled) return;
 
     // Prefer ElevenLabs if configured
-    if (
-      config?.ttsProvider === "elevenlabs" &&
-      config?.elevenlabsApiKey &&
-      config?.elevenlabsVoiceId
-    ) {
+    if (config?.ttsProvider === "elevenlabs" && config?.elevenlabsApiKey) {
       try {
-        // Cancel any existing playback first
-        try {
-          controllerRef.current?.cancel?.();
-        } catch {}
-
-        const controller = await speakWithElevenLabs(
-          text,
-          {
-            apiKey: config.elevenlabsApiKey,
-            voiceId: config.elevenlabsVoiceId,
-          },
-          {
-            onStart: () => {
-              speakingRef.current = true;
-              onStart && onStart();
-            },
-            onEnd: () => {
-              speakingRef.current = false;
-              onEnd && onEnd();
-            },
+        // Resolve ElevenLabs voice ID if missing but a preferred voice name is provided
+        let resolvedVoiceId = config?.elevenlabsVoiceId;
+        if (!resolvedVoiceId && config?.elevenlabsVoiceName) {
+          try {
+            const voices = await listElevenLabsVoices(config.elevenlabsApiKey);
+            const match = voices.find(
+              (v) => (v?.name || "").toLowerCase() === String(config.elevenlabsVoiceName || "").toLowerCase()
+            );
+            if (match?.voice_id) {
+              resolvedVoiceId = match.voice_id;
+              try {
+                // Persist for subsequent calls
+                useConfigStore.getState().updateConfig({ elevenlabsVoiceId: resolvedVoiceId });
+              } catch {}
+            }
+          } catch {
+            // ignore resolution errors; will fall back to browser TTS if still missing
           }
-        );
-        controllerRef.current = controller;
-        return;
+        }
+
+        if (resolvedVoiceId) {
+          // Cancel any existing playback first
+          try {
+            controllerRef.current?.cancel?.();
+          } catch {}
+
+          const controller = await speakWithElevenLabs(
+            text,
+            {
+              apiKey: config.elevenlabsApiKey,
+              voiceId: resolvedVoiceId,
+            },
+            {
+              onStart: () => {
+                speakingRef.current = true;
+                onStart && onStart();
+              },
+              onEnd: () => {
+                speakingRef.current = false;
+                onEnd && onEnd();
+              },
+            }
+          );
+          controllerRef.current = controller;
+          return;
+        }
       } catch {
         // Fall back to browser TTS
       }
