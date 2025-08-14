@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG = {
   // AI system prompt and verbosity
   systemPrompt:
     "You produce timely ambient commentary for a writer. Be helpful, warm, and constructive. Provide 2–4 concise sentences unless the user content strongly suggests otherwise.",
-  maxTokens: 300, // allow more verbose commentary by default
+  maxTokens: 5000, // allow more verbose commentary by default
   allowToolCalling: true, // enable LLM tool-calling schema (future tools can hook in)
 
   // AI Behavior
@@ -44,7 +44,7 @@ export const DEFAULT_CONFIG = {
   debugLogging: false, // log prompts, responses, and state changes to console
   showTraceOverlay: true, // show thinking overlay pane
   orbPosition: null, // { x: number, y: number } pixels from top-left (null = default bottom-right)
-  overlayPosition: null, // { x, y } position for the thinking overlay (null = default top-left)
+  overlayPosition: null, // { x, y } position for the thinking overlay (null = default bottom-left)
 
   // Use Cases (toggleable)
   useCases: {

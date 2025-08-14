@@ -88,7 +88,7 @@ export default function ThinkingOverlay() {
   const style =
     pos && typeof pos.x === "number" && typeof pos.y === "number"
       ? { left: `${pos.x}px`, top: `${pos.y}px` }
-      : { left: 16, top: 16 };
+      : { left: 16, bottom: 16 };
 
   const status = trace.error
     ? "error"

@@ -79,7 +79,7 @@ export default function Settings() {
     };
   }, [config.ttsProvider, config.elevenlabsApiKey]);
 
-  const currentProvider = (config.aiProvider || "openai").toLowerCase();
+  const currentProvider = "openai";
   const modelOptions =
     currentProvider === "anthropic" ? ANTHROPIC_MODELS : OPENAI_MODELS;
 
@@ -217,11 +217,10 @@ export default function Settings() {
         <div className="font-semibold mb-2">AI Provider</div>
         <select
           className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800 mb-3"
-          value={config.aiProvider}
-          onChange={(e) => updateConfig({ aiProvider: e.target.value })}
+          value="openai"
+          disabled
         >
           <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
         </select>
 
         {currentProvider === "openai" ? (
@@ -295,9 +294,9 @@ export default function Settings() {
             <input
               type="number"
               min={60}
-              max={1000}
+              max={50000}
               className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-              value={config.maxTokens ?? 300}
+              value={config.maxTokens ?? 5000}
               onChange={(e) =>
                 updateConfig({ maxTokens: Number(e.target.value) })
               }

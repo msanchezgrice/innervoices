@@ -107,7 +107,7 @@ export default function Orb({ state = "idle", isActive = true, onClick }) {
   else symbol = isActive ? "⏸" : "▶";
 
   const containerCls = clsx("fixed z-50 group select-none", {
-    "bottom-4 right-4 md:bottom-8 md:right-8": !pos, // default docked position (mobile-friendly)
+    "bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 transform": !pos, // default docked position: bottom-center (mobile-friendly)
   });
 
   const containerStyle =
