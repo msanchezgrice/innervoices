@@ -63,7 +63,17 @@ function App() {
   const notes = useNotesStore((s) => s.notes);
   const currentId = useNotesStore((s) => s.currentId);
   const updateContent = useNotesStore((s) => s.updateContent);
+  const createNote = useNotesStore((s) => s.createNote);
+  const selectNote = useNotesStore((s) => s.selectNote);
   const activeNote = notes.find((n) => n.id === currentId) || null;
+
+  // Auto-create and select the first note so the user can type immediately
+  useEffect(() => {
+    if ((!notes || notes.length === 0) && !currentId) {
+      const id = createNote("Untitled");
+      selectNote(id);
+    }
+  }, []);
 
   const config = useConfigStore((s) => s.config);
   const updateConfig = useConfigStore((s) => s.updateConfig);
@@ -195,6 +205,7 @@ function App() {
       {config.showNotes && <NotesSidebar />}
       <div className={`flex-1 h-full ${!config.showNotes ? "pl-12" : ""}`}>
         <Notepad
+          key={currentId || "notepad"}
           value={activeNote?.content || ""}
           onChange={(v) => activeNote && updateContent(activeNote.id, v)}
         />

@@ -1,6 +1,7 @@
 export default function Notepad({ value, onChange }) {
   return (
     <textarea
+      autoFocus
       placeholder="Start writing... InnerVoice is listening"
       value={value || ""}
       onChange={(e) => onChange(e.target.value)}

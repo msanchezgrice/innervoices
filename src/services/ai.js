@@ -113,7 +113,7 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     input: prompt,
     ...(allowTempR ? { temperature: Number(config?.creativity ?? 0.7) } : {}),
     // Responses API uses max_output_tokens
-    max_output_tokens: Number(config?.maxTokens ?? 25000),
+    max_output_tokens: Number(config?.maxTokens ?? 10000),
     ...(allowToolCalling ? { tools: OPENAI_TOOLS } : {}),
   };
 
@@ -189,7 +189,7 @@ async function callOpenAIChat(prompt, config, { allowToolCalling = false } = {},
     model,
     messages: baseMessages,
     ...(allowTemp ? { temperature: Number(config?.creativity ?? 0.7) } : {}),
-          [tokenParam]: Number(config?.maxTokens ?? 25000),
+          [tokenParam]: Number(config?.maxTokens ?? 10000),
     ...(allowToolCalling ? { tools: OPENAI_TOOLS } : {}),
   };
 
@@ -242,7 +242,7 @@ async function callOpenAIChat(prompt, config, { allowToolCalling = false } = {},
         model,
         messages,
         ...(allowTemp ? { temperature: Number(config?.creativity ?? 0.7) } : {}),
-        [tokenParam]: Number(config?.maxTokens ?? 25000),
+        [tokenParam]: Number(config?.maxTokens ?? 10000),
       };
       if (config?.debugLogging) {
         try { console.debug("[InnerVoices][AI][OpenAI][Chat] Follow-up body:", followBody); } catch {}
@@ -291,7 +291,7 @@ async function callAnthropicChat(prompt, config, { allowToolCalling = false } = 
         content: [{ type: "text", text: prompt }],
       },
     ],
-    max_tokens: Number(config?.maxTokens ?? 25000),
+    max_tokens: Number(config?.maxTokens ?? 10000),
     temperature: Number(config?.creativity ?? 0.7),
     ...(allowToolCalling ? { tools: ANTHROPIC_TOOLS } : {}),
   };
@@ -340,7 +340,7 @@ async function callAnthropicChat(prompt, config, { allowToolCalling = false } = 
           { role: "assistant", content },
           { role: "user", content: toolResults },
         ],
-        max_tokens: Number(config?.maxTokens ?? 25000),
+        max_tokens: Number(config?.maxTokens ?? 10000),
         temperature: Number(config?.creativity ?? 0.7),
         ...(allowToolCalling ? { tools: ANTHROPIC_TOOLS } : {}),
       };
@@ -399,7 +399,7 @@ export async function analyzeText(text, config = {}, events) {
     personality: resolvedPersonality,
     tone: resolvedTone,
     creativity: Number(config?.creativity ?? 0.7),
-    maxTokens: Number(config?.maxTokens ?? 25000),
+    maxTokens: Number(config?.maxTokens ?? 10000),
     commentInterval: Number(config?.commentInterval ?? 10000),
     commentProbability: Number(config?.commentProbability ?? 0.3),
   };
@@ -449,7 +449,7 @@ export async function analyzeText(text, config = {}, events) {
       console.debug("[InnerVoices][AI] Response in", ms + "ms:", raw);
     }
 
-    return truncateWords(raw, Number(config?.maxCommentLength ?? 50));
+    return truncateWords(raw, Number(config?.maxCommentLength ?? 200));
   } catch (err) {
     events?.onApiEnd?.({ provider, model, ms: 0, ok: false, error: err?.message || String(err) });
     if (config?.debugLogging) {

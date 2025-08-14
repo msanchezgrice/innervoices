@@ -26,12 +26,12 @@ export const DEFAULT_CONFIG = {
   // AI system prompt and verbosity
   systemPrompt:
     "You produce timely ambient commentary for a writer. Be helpful, warm, and constructive. Provide 2–4 concise sentences unless the user content strongly suggests otherwise.",
-  maxTokens: 25000, // allow more verbose commentary by default
+  maxTokens: 10000, // default output token limit
   allowToolCalling: true, // enable LLM tool-calling schema (future tools can hook in)
 
   // AI Behavior
   commentProbability: 0.3, // 0-1, chance of commenting
-  maxCommentLength: 100, // words (post-truncation safety)
+  maxCommentLength: 200, // words (post-truncation safety)
   creativity: 0.7, // 0-1, AI temperature
 
   // Personality

@@ -296,7 +296,7 @@ export default function Settings() {
               min={60}
               max={50000}
               className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-              value={config.maxTokens ?? 25000}
+              value={config.maxTokens ?? 10000}
               onChange={(e) =>
                 updateConfig({ maxTokens: Number(e.target.value) })
               }
