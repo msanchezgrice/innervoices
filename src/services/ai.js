@@ -476,14 +476,22 @@ export async function analyzeText(text, config = {}, events, responseHistory = [
 
     const ms = Date.now() - t0;
     events?.onApiEnd?.({ provider, model, ms, ok: true });
-    events?.onResponse?.(raw);
     
     console.log("[analyzeText] AI response received", {
       responseTime: ms,
       responseLength: raw?.length || 0,
       provider,
-      model
+      model,
+      hasOnResponse: !!events?.onResponse
     });
+    
+    // Call onResponse with the raw response for history
+    if (events?.onResponse) {
+      console.log("[analyzeText] Calling onResponse with raw text");
+      events.onResponse(raw);
+    } else {
+      console.log("[analyzeText] No onResponse handler provided");
+    }
 
     const truncated = truncateWords(raw, Number(config?.maxCommentLength ?? 200));
     console.log("[analyzeText] Final output:", truncated?.substring(0, 100) + "...");

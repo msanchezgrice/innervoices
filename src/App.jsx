@@ -161,7 +161,15 @@ function App() {
       }
     },
     onResponse: (r) => {
+      console.log("[App] onResponse called with:", {
+        responseLength: r?.length || 0,
+        responsePreview: r?.substring(0, 50),
+        currentNoteId: currentId,
+        hasCurrentId: !!currentId
+      });
+      
       setTrace((t) => ({ ...t, response: r || "" }));
+      
       if (r && r.trim() && currentId) {
         const currentTrace = useConfigStore.getState().trace;
         console.log("[App] Adding response to history for note:", currentId, "model:", currentTrace.model);
@@ -169,6 +177,7 @@ function App() {
       } else {
         console.log("[App] Not adding response to history - missing data:", {
           hasResponse: !!r,
+          responseIsEmpty: !r || !r.trim(),
           responseLength: r?.length,
           hasNoteId: !!currentId,
           noteId: currentId
