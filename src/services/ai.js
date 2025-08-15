@@ -334,9 +334,17 @@ function extractTextFromResponsesOutput(data) {
     
     // Check for message with content array (conversational format)
     if (item?.type === "message" && Array.isArray(item?.content)) {
+      // Look for output_text type first (Responses API format)
+      const outputTextPart = item.content.find(c => c?.type === "output_text" && typeof c?.text === "string");
+      if (outputTextPart?.text) {
+        console.log("[extractText] Found text in message.content with type='output_text'");
+        return outputTextPart.text.trim();
+      }
+      
+      // Then look for regular text type
       const textPart = item.content.find(c => c?.type === "text" && typeof c?.text === "string");
       if (textPart?.text) {
-        console.log("[extractText] Found text in message.content array");
+        console.log("[extractText] Found text in message.content array with type='text'");
         return textPart.text.trim();
       }
     }
