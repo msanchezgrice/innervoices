@@ -107,7 +107,6 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     model,
     instructions: system,
     input: prompt,
-    temperature: Number(config?.creativity ?? 0.7),
     max_output_tokens: Number(config?.maxTokens ?? 10000),
     ...(allowToolCalling ? { 
       tools: OPENAI_TOOLS,
@@ -170,7 +169,6 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
         model,
         instructions: system,
         input: prompt,
-        temperature: Number(config?.creativity ?? 0.7),
         max_output_tokens: Number(config?.maxTokens ?? 10000),
         context: {
           previous_output: output,
