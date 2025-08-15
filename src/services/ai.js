@@ -33,8 +33,8 @@ function getAnthropicConfig(config = {}) {
   };
 }
 
-// Tool definitions (shared semantics for both providers)
-const OPENAI_TOOLS = [
+// Tool definitions for Chat Completions API (kept for fallback)
+const OPENAI_CHAT_TOOLS = [
   {
     type: "function",
     function: {
@@ -56,6 +56,28 @@ const OPENAI_TOOLS = [
       description: "Returns current local time as ISO string.",
       parameters: { type: "object", properties: {} },
     },
+  },
+];
+
+// Tool definitions for Responses API
+const OPENAI_RESPONSES_TOOLS = [
+  {
+    type: "function",
+    name: "detect_context",
+    description: "Detect writing context cues in the user's text.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "Full user text." },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    type: "function",
+    name: "get_time",
+    description: "Returns current local time as ISO string.",
+    parameters: { type: "object", properties: {} },
   },
 ];
 
@@ -94,7 +116,7 @@ async function executeBuiltinTool(name, args) {
 }
 
 /**
- * OpenAI Responses API call
+ * OpenAI Responses API call with fallback to Chat Completions
  */
 async function callOpenAIResponses(prompt, config, { allowToolCalling = false } = {}, events) {
   const { apiKey, model } = getOpenAIConfig(config);
@@ -106,35 +128,42 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   }
   const system = getSystemPrompt(config);
 
-  // Use Responses API
-  const body = {
+  // Try Responses API first
+  const responsesBody = {
     model,
     instructions: system,
     input: prompt,
     temperature: Number(config?.creativity ?? 0.7),
     max_output_tokens: Number(config?.maxTokens ?? 10000),
-    ...(allowToolCalling ? { tools: OPENAI_TOOLS } : {}),
+    ...(allowToolCalling ? { 
+      tools: OPENAI_RESPONSES_TOOLS,
+      tool_choice: "auto"  // Allow model to decide when to use tools
+    } : {}),
   };
 
   if (config?.debugLogging) {
-    try { console.debug("[InnerVoices][AI][OpenAI][Responses] Body:", body); } catch {}
+    try { console.debug("[InnerVoices][AI][OpenAI][Responses] Body:", responsesBody); } catch {}
   }
   
   let res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      "OpenAI-Beta": "responses-api-v1"  // Required beta header for Responses API
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(responsesBody),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     if (config?.debugLogging) {
       console.error("[InnerVoices][AI][OpenAI][Responses] HTTP", res.status, "error:", text);
+      console.debug("[InnerVoices][AI][OpenAI] Falling back to Chat Completions API");
     }
-    throw new Error(`OpenAI Responses error ${res.status}: ${text}`);
+    
+    // Fallback to Chat Completions API
+    return callOpenAIChatCompletions(prompt, config, { allowToolCalling }, events);
   }
 
   const data = await res.json();
@@ -181,8 +210,9 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
       const followRes = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "responses-api-v1"
         },
         body: JSON.stringify(followBody),
       });
@@ -224,6 +254,102 @@ function extractTextFromResponsesOutput(output) {
   }
   
   return "";
+}
+
+/**
+ * Fallback to OpenAI Chat Completions API (stable and working)
+ */
+async function callOpenAIChatCompletions(prompt, config, { allowToolCalling = false } = {}, events) {
+  const { apiKey, model } = getOpenAIConfig(config);
+  const system = getSystemPrompt(config);
+
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: prompt }
+  ];
+
+  const body = {
+    model,
+    messages,
+    temperature: Number(config?.creativity ?? 0.7),
+    max_tokens: Number(config?.maxTokens ?? 10000),
+    ...(allowToolCalling ? { tools: OPENAI_CHAT_TOOLS } : {}),
+  };
+
+  if (config?.debugLogging) {
+    try { console.debug("[InnerVoices][AI][OpenAI][Chat] Body:", body); } catch {}
+  }
+  
+  let res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    if (config?.debugLogging) {
+      console.error("[InnerVoices][AI][OpenAI][Chat] HTTP", res.status, "error:", text);
+    }
+    throw new Error(`OpenAI Chat error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  const message = data.choices?.[0]?.message;
+  
+  if (allowToolCalling && message?.tool_calls?.length > 0) {
+    events?.onToolStart?.();
+    
+    try {
+      const toolResults = [];
+      for (const tc of message.tool_calls) {
+        const name = tc?.function?.name;
+        let args = {};
+        try {
+          args = JSON.parse(tc?.function?.arguments || "{}");
+        } catch {}
+        const result = await executeBuiltinTool(name, args);
+        toolResults.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          name,
+          content: JSON.stringify(result),
+        });
+      }
+
+      // Follow-up call with tool results
+      const followBody = {
+        model,
+        messages: [...messages, message, ...toolResults],
+        temperature: Number(config?.creativity ?? 0.7),
+        max_tokens: Number(config?.maxTokens ?? 10000),
+      };
+
+      const followRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(followBody),
+      });
+
+      if (!followRes.ok) {
+        const text = await followRes.text().catch(() => "");
+        throw new Error(`OpenAI follow-up error ${followRes.status}: ${text}`);
+      }
+
+      const followData = await followRes.json();
+      return followData.choices?.[0]?.message?.content?.trim() || "";
+    } finally {
+      events?.onToolEnd?.();
+    }
+  }
+
+  return message?.content?.trim() || "";
 }
 
 
