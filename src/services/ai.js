@@ -94,7 +94,7 @@ async function executeBuiltinTool(name, args) {
 }
 
 /**
- * OpenAI Chat Completions API call (using standard API for now due to auth issues with Responses)
+ * OpenAI Responses API call
  */
 async function callOpenAIResponses(prompt, config, { allowToolCalling = false } = {}, events) {
   const { apiKey, model } = getOpenAIConfig(config);
@@ -106,25 +106,21 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   }
   const system = getSystemPrompt(config);
 
-  // Use Chat Completions API (stable and working)
-  const messages = [
-    { role: "system", content: system },
-    { role: "user", content: prompt }
-  ];
-
+  // Use Responses API
   const body = {
     model,
-    messages,
+    instructions: system,
+    input: prompt,
     temperature: Number(config?.creativity ?? 0.7),
-    max_tokens: Number(config?.maxTokens ?? 10000),
+    max_output_tokens: Number(config?.maxTokens ?? 10000),
     ...(allowToolCalling ? { tools: OPENAI_TOOLS } : {}),
   };
 
   if (config?.debugLogging) {
-    try { console.debug("[InnerVoices][AI][OpenAI][Chat] Body:", body); } catch {}
+    try { console.debug("[InnerVoices][AI][OpenAI][Responses] Body:", body); } catch {}
   }
   
-  let res = await fetch("https://api.openai.com/v1/chat/completions", {
+  let res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -136,20 +132,23 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     if (config?.debugLogging) {
-      console.error("[InnerVoices][AI][OpenAI][Chat] HTTP", res.status, "error:", text);
+      console.error("[InnerVoices][AI][OpenAI][Responses] HTTP", res.status, "error:", text);
     }
-    throw new Error(`OpenAI Chat error ${res.status}: ${text}`);
+    throw new Error(`OpenAI Responses error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
-  const message = data.choices?.[0]?.message;
   
-  if (allowToolCalling && message?.tool_calls?.length > 0) {
+  // Handle tool calls if present
+  const output = data?.output || [];
+  const toolCalls = output.filter(item => item?.type === "function");
+  
+  if (allowToolCalling && toolCalls.length > 0) {
     events?.onToolStart?.();
     
     try {
       const toolResults = [];
-      for (const tc of message.tool_calls) {
+      for (const tc of toolCalls) {
         const name = tc?.function?.name;
         let args = {};
         try {
@@ -157,22 +156,29 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
         } catch {}
         const result = await executeBuiltinTool(name, args);
         toolResults.push({
-          role: "tool",
-          tool_call_id: tc.id,
-          name,
-          content: JSON.stringify(result),
+          type: "function",
+          function: {
+            name,
+            result: JSON.stringify(result),
+          },
+          id: tc.id,
         });
       }
 
       // Follow-up call with tool results
       const followBody = {
         model,
-        messages: [...messages, message, ...toolResults],
+        instructions: system,
+        input: prompt,
         temperature: Number(config?.creativity ?? 0.7),
-        max_tokens: Number(config?.maxTokens ?? 10000),
+        max_output_tokens: Number(config?.maxTokens ?? 10000),
+        context: {
+          previous_output: output,
+          tool_results: toolResults,
+        },
       };
 
-      const followRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      const followRes = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -187,13 +193,37 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
       }
 
       const followData = await followRes.json();
-      return followData.choices?.[0]?.message?.content?.trim() || "";
+      return extractTextFromResponsesOutput(followData?.output || []);
     } finally {
       events?.onToolEnd?.();
     }
   }
 
-  return message?.content?.trim() || "";
+  return extractTextFromResponsesOutput(output);
+}
+
+/**
+ * Extract text from Responses API output format
+ */
+function extractTextFromResponsesOutput(output) {
+  if (!Array.isArray(output)) return "";
+  
+  for (const item of output) {
+    // Check for direct text output
+    if (item?.type === "text" && typeof item?.text === "string") {
+      return item.text.trim();
+    }
+    
+    // Check for message with content array
+    if (item?.type === "message" && Array.isArray(item?.content)) {
+      const textPart = item.content.find(c => c?.type === "text" && typeof c?.text === "string");
+      if (textPart?.text) {
+        return textPart.text.trim();
+      }
+    }
+  }
+  
+  return "";
 }
 
 
