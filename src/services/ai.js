@@ -102,12 +102,11 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   }
   const system = getSystemPrompt(config);
 
-  // Use Responses API with future-proof format
+  // Use Responses API
   const body = {
     model,
     instructions: system,
-    // Use array format for future multi-modal support
-    input: [{ type: "text", text: prompt }],
+    input: prompt,  // Keep as plain string - API doesn't accept array format yet
     // Ensure max_output_tokens is reasonable for all models
     max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
     ...(allowToolCalling ? { 
@@ -171,7 +170,7 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
       const followBody = {
         model,
         instructions: system,
-        input: [{ type: "text", text: prompt }],
+        input: prompt,  // Keep as plain string
         max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
         context: {
           previous_output: output,
