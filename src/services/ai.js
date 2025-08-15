@@ -94,7 +94,7 @@ async function executeBuiltinTool(name, args) {
 }
 
 /**
- * OpenAI Responses API call (prefers new Responses API; falls back to Chat Completions on failure)
+ * OpenAI Chat Completions API call (using standard API for now due to auth issues with Responses)
  */
 async function callOpenAIResponses(prompt, config, { allowToolCalling = false } = {}, events) {
   const { apiKey, model } = getOpenAIConfig(config);
@@ -106,24 +106,25 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   }
   const system = getSystemPrompt(config);
 
-  const allowTempR =
-    !(model?.startsWith("gpt-5") || model?.startsWith("gpt-4.1"));
+  // Use Chat Completions API (stable and working)
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: prompt }
+  ];
 
   const body = {
     model,
-    // Responses API: put system in 'instructions' and user content in 'input'
-    instructions: system,
-    input: prompt,
-    ...(allowTempR ? { temperature: Number(config?.creativity ?? 0.7) } : {}),
-    // Responses API uses max_output_tokens
-    max_output_tokens: Number(config?.maxTokens ?? 10000),
+    messages,
+    temperature: Number(config?.creativity ?? 0.7),
+    max_tokens: Number(config?.maxTokens ?? 10000),
     ...(allowToolCalling ? { tools: OPENAI_TOOLS } : {}),
   };
 
   if (config?.debugLogging) {
-    try { console.debug("[InnerVoices][AI][OpenAI][Responses] Body:", body); } catch {}
+    try { console.debug("[InnerVoices][AI][OpenAI][Chat] Body:", body); } catch {}
   }
-  let res = await fetch("https://api.openai.com/v1/responses", {
+  
+  let res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -135,37 +136,64 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     if (config?.debugLogging) {
-      console.error("[InnerVoices][AI][OpenAI][Responses] HTTP", res.status, "error:", text);
+      console.error("[InnerVoices][AI][OpenAI][Chat] HTTP", res.status, "error:", text);
     }
-    throw new Error(`OpenAI Responses error ${res.status}: ${text}`);
+    throw new Error(`OpenAI Chat error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
+  const message = data.choices?.[0]?.message;
+  
+  if (allowToolCalling && message?.tool_calls?.length > 0) {
+    events?.onToolStart?.();
+    
+    try {
+      const toolResults = [];
+      for (const tc of message.tool_calls) {
+        const name = tc?.function?.name;
+        let args = {};
+        try {
+          args = JSON.parse(tc?.function?.arguments || "{}");
+        } catch {}
+        const result = await executeBuiltinTool(name, args);
+        toolResults.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          name,
+          content: JSON.stringify(result),
+        });
+      }
 
-  // Convenience: some SDKs include `output_text`; also parse messages if present
-  if (typeof data?.output_text === "string" && data.output_text.trim()) {
-    return data.output_text.trim();
+      // Follow-up call with tool results
+      const followBody = {
+        model,
+        messages: [...messages, message, ...toolResults],
+        temperature: Number(config?.creativity ?? 0.7),
+        max_tokens: Number(config?.maxTokens ?? 10000),
+      };
+
+      const followRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(followBody),
+      });
+
+      if (!followRes.ok) {
+        const text = await followRes.text().catch(() => "");
+        throw new Error(`OpenAI follow-up error ${followRes.status}: ${text}`);
+      }
+
+      const followData = await followRes.json();
+      return followData.choices?.[0]?.message?.content?.trim() || "";
+    } finally {
+      events?.onToolEnd?.();
+    }
   }
 
-  const getTextFromOutput = (out) => {
-    if (!Array.isArray(out)) return "";
-    for (const item of out) {
-      // { type: 'message', content: [{type:'text', text:'...'}] }
-      const contentArr = item?.content;
-      if (Array.isArray(contentArr)) {
-        const textPart = contentArr.find((c) => c?.type === "text" && typeof c?.text === "string");
-        if (textPart?.text?.trim()) return textPart.text.trim();
-      }
-      // { type: 'output_text', text: '...' }
-      if (item?.type === "output_text" && typeof item?.text === "string" && item.text.trim()) {
-        return item.text.trim();
-      }
-    }
-    return "";
-  };
-
-  const text = getTextFromOutput(data?.output || []);
-  return (text || "").trim();
+  return message?.content?.trim() || "";
 }
 
 

@@ -200,20 +200,22 @@ function App() {
 
   return (
     <div className="w-screen h-screen flex">
-      {config.showNotes && <NotesSidebar />}
-      <div className={`flex-1 h-full ${!config.showNotes ? "pl-12" : ""} ${showResponseHistory ? "pr-96" : ""}`}>
-        <Notepad
-          key={currentId || "notepad"}
-          value={activeNote?.content || ""}
-          onChange={(v) => activeNote && updateContent(activeNote.id, v)}
-        />
-      </div>
+      {currentRoute.type === 'app' && config.showNotes && <NotesSidebar />}
+      {currentRoute.type === 'app' && (
+        <div className={`flex-1 h-full ${!config.showNotes ? "pl-12" : ""} ${showResponseHistory ? "pr-96" : ""}`}>
+          <Notepad
+            key={currentId || "notepad"}
+            value={activeNote?.content || ""}
+            onChange={(v) => activeNote && updateContent(activeNote.id, v)}
+          />
+        </div>
+      )}
 
-      <Orb state={orbState} isActive={isActive} onClick={handleOrbClick} />
+      {currentRoute.type === 'app' && <Orb state={orbState} isActive={isActive} onClick={handleOrbClick} />}
 
-      {showSettings && <Settings />}
-      {showResponseHistory && <ResponseHistory onClose={() => setShowResponseHistory(false)} noteId={currentId} />}
-      <ThinkingOverlay />
+      {currentRoute.type === 'app' && showSettings && <Settings />}
+      {currentRoute.type === 'app' && showResponseHistory && <ResponseHistory onClose={() => setShowResponseHistory(false)} noteId={currentId} />}
+      {currentRoute.type === 'app' && <ThinkingOverlay />}
 
       {currentRoute.type === 'landing' && (
         <div className="fixed inset-0 z-[100]">
