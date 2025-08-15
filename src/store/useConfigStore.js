@@ -13,15 +13,15 @@ const persisted = (() => {
 const persistedHistory = (() => {
   try {
     const raw = localStorage.getItem("iv_response_history");
-    return raw ? JSON.parse(raw) : [];
+    return raw ? JSON.parse(raw) : {};
   } catch {
-    return [];
+    return {};
   }
 })();
 
 export const useConfigStore = create((set, get) => ({
   config: persisted || DEFAULT_CONFIG,
-  responseHistory: persistedHistory,
+  responseHistory: persistedHistory, // Now an object keyed by note ID
   updateConfig: (partial) =>
     set((state) => {
       const next =
@@ -109,9 +109,11 @@ export const useConfigStore = create((set, get) => ({
       },
     }),
 
-  // Response History
-  addResponseToHistory: (response, model) => 
+  // Response History (per note)
+  addResponseToHistory: (response, model, noteId) => 
     set((state) => {
+      if (!noteId) return state; // Skip if no note ID provided
+      
       const newEntry = {
         id: Date.now() + Math.random(), // Simple unique ID
         response,
@@ -119,7 +121,13 @@ export const useConfigStore = create((set, get) => ({
         timestamp: Date.now(),
       };
       
-      const newHistory = [newEntry, ...state.responseHistory].slice(0, 100); // Keep last 100 responses
+      const currentNoteHistory = state.responseHistory[noteId] || [];
+      const newNoteHistory = [newEntry, ...currentNoteHistory].slice(0, 100); // Keep last 100 responses per note
+      
+      const newHistory = {
+        ...state.responseHistory,
+        [noteId]: newNoteHistory
+      };
       
       try {
         localStorage.setItem("iv_response_history", JSON.stringify(newHistory));
@@ -128,10 +136,30 @@ export const useConfigStore = create((set, get) => ({
       return { responseHistory: newHistory };
     }),
 
-  clearResponseHistory: () => {
-    try {
-      localStorage.removeItem("iv_response_history");
-    } catch {}
-    set({ responseHistory: [] });
+  clearResponseHistory: (noteId) => {
+    if (noteId) {
+      // Clear history for specific note
+      set((state) => {
+        const newHistory = { ...state.responseHistory };
+        delete newHistory[noteId];
+        
+        try {
+          localStorage.setItem("iv_response_history", JSON.stringify(newHistory));
+        } catch {}
+        
+        return { responseHistory: newHistory };
+      });
+    } else {
+      // Clear all history
+      try {
+        localStorage.removeItem("iv_response_history");
+      } catch {}
+      set({ responseHistory: {} });
+    }
+  },
+
+  getResponseHistoryForNote: (noteId) => {
+    const state = get();
+    return state.responseHistory[noteId] || [];
   },
 }));

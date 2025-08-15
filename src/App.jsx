@@ -11,35 +11,25 @@ import { useNotesStore } from "./store/useNotesStore.js";
 import Landing from "./components/Landing.jsx";
 import OnboardingModal from "./components/OnboardingModal.jsx";
 import ResponseHistory from "./components/ResponseHistory.jsx";
+import { useRouter } from "./hooks/useRouter.js";
 
 function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showResponseHistory, setShowResponseHistory] = useState(false);
-  const [showLanding, setShowLanding] = useState(() => {
-    try {
-      return !localStorage.getItem("iv_has_seen_landing");
-    } catch {
-      return true;
-    }
-  });
+  const { currentRoute, navigateToApp, navigateToLanding } = useRouter();
 
   const startFromLanding = () => {
-    try {
-      localStorage.setItem("iv_has_seen_landing", "1");
-    } catch {}
-    setShowLanding(false);
+    navigateToApp();
   };
 
   const showSetupFromLanding = () => {
-    try {
-      localStorage.setItem("iv_has_seen_landing", "1");
-    } catch {}
-    setShowLanding(false);
+    const sessionId = navigateToApp();
     setShowSettings(true);
   };
 
-  // Onboarding after landing
+  // Onboarding after landing (only for app routes)
   const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (currentRoute.type === 'landing') return false;
     try {
       return !localStorage.getItem("iv_onboarded");
     } catch {
@@ -150,9 +140,9 @@ function App() {
     },
     onResponse: (r) => {
       setTrace((t) => ({ ...t, response: r || "" }));
-      if (r && r.trim()) {
+      if (r && r.trim() && currentId) {
         const currentTrace = useConfigStore.getState().trace;
-        addResponseToHistory(r, currentTrace.model || "Unknown");
+        addResponseToHistory(r, currentTrace.model || "Unknown", currentId);
       }
     },
     onSystemPrompt: (s) => {
@@ -179,7 +169,8 @@ function App() {
         }, 2000);
       }
     },
-    enabled: isActive && !showLanding && !showOnboarding,
+    enabled: isActive && currentRoute.type === 'app' && !showOnboarding,
+    noteId: currentId,
   });
 
   useEffect(() => {
@@ -221,16 +212,16 @@ function App() {
       <Orb state={orbState} isActive={isActive} onClick={handleOrbClick} />
 
       {showSettings && <Settings />}
-      {showResponseHistory && <ResponseHistory onClose={() => setShowResponseHistory(false)} />}
+      {showResponseHistory && <ResponseHistory onClose={() => setShowResponseHistory(false)} noteId={currentId} />}
       <ThinkingOverlay />
 
-      {showLanding && (
+      {currentRoute.type === 'landing' && (
         <div className="fixed inset-0 z-[100]">
           <Landing onStart={startFromLanding} onShowSetup={showSetupFromLanding} />
         </div>
       )}
 
-      {!showLanding && showOnboarding && (
+      {currentRoute.type === 'app' && showOnboarding && (
         <OnboardingModal
           open
           onSaveOpenAI={handleOnboardingSave}
@@ -239,18 +230,30 @@ function App() {
         />
       )}
 
-      {!config.showNotes && (
-        <button
-          className="fixed top-4 left-4 z-50 border rounded px-3 py-1 bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700"
-          onClick={() => updateConfig({ showNotes: true })}
-          title="Show Notes"
-        >
-          ☰
-        </button>
+      {currentRoute.type === 'app' && (
+        <>
+          {!config.showNotes && (
+            <button
+              className="fixed top-4 left-4 z-50 border rounded px-3 py-1 bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700"
+              onClick={() => updateConfig({ showNotes: true })}
+              title="Show Notes"
+            >
+              ☰
+            </button>
+          )}
+
+          <button
+            className="fixed bottom-4 left-4 z-50 text-xs px-3 py-1 border rounded bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
+            onClick={navigateToLanding}
+            title="Back to Landing"
+          >
+            ← Landing
+          </button>
+        </>
       )}
 
-
-      <div className="fixed top-4 right-4 z-50 flex gap-2">
+      {currentRoute.type === 'app' && (
+        <div className="fixed top-4 right-4 z-50 flex gap-2">
         <button
           className="border rounded px-2.5 py-2 bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700"
           onClick={() => setShowResponseHistory((s) => !s)}
@@ -272,7 +275,8 @@ function App() {
             <circle cx="12" cy="12" r="3" />
           </svg>
         </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ export function useWatcher(
     onSystemPrompt,
     onMeta,
     enabled = true,
+    noteId = null,
   } = {}
 ) {
   const textRef = useRef(text || "");
@@ -76,8 +77,9 @@ export function useWatcher(
         runningRef.current = true;
         onThinking && onThinking();
 
-        // Get response history from store for memory
-        const responseHistory = useConfigStore.getState().responseHistory || [];
+        // Get response history from store for memory (note-specific)
+        const getResponseHistoryForNote = useConfigStore.getState().getResponseHistoryForNote;
+        const responseHistory = noteId ? getResponseHistoryForNote(noteId) : [];
         
         // Call AI
         const commentary = await analyzeText(currentText, config, {

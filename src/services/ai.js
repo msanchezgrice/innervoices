@@ -99,6 +99,11 @@ async function executeBuiltinTool(name, args) {
 async function callOpenAIResponses(prompt, config, { allowToolCalling = false } = {}, events) {
   const { apiKey, model } = getOpenAIConfig(config);
   if (!apiKey) throw new Error("Missing OpenAI API key");
+  if (!apiKey.trim()) throw new Error("OpenAI API key is empty");
+  if (config?.debugLogging) {
+    console.debug("[InnerVoices][AI][OpenAI] API Key length:", apiKey.length);
+    console.debug("[InnerVoices][AI][OpenAI] API Key starts with:", apiKey.substring(0, 7));
+  }
   const system = getSystemPrompt(config);
 
   const allowTempR =

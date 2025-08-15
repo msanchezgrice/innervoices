@@ -14,8 +14,10 @@ function formatTimeAgo(timestamp) {
   return `${days}d ago`;
 }
 
-export default function ResponseHistory({ onClose = () => {} }) {
-  const responseHistory = useConfigStore((s) => s.responseHistory || []);
+export default function ResponseHistory({ onClose = () => {}, noteId = null }) {
+  const getResponseHistoryForNote = useConfigStore((s) => s.getResponseHistoryForNote);
+  const clearResponseHistory = useConfigStore((s) => s.clearResponseHistory);
+  const responseHistory = getResponseHistoryForNote(noteId) || [];
   const scrollRef = useRef(null);
 
   // Auto-scroll to top when new responses are added
@@ -81,10 +83,10 @@ export default function ResponseHistory({ onClose = () => {} }) {
         <button
           className="w-full text-xs px-3 py-2 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
           onClick={() => {
-            useConfigStore.getState().clearResponseHistory();
+            clearResponseHistory(noteId);
           }}
         >
-          Clear History
+          Clear History for This Note
         </button>
       </div>
     </div>
