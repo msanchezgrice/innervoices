@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { analyzeText } from "../services/ai";
+import { useConfigStore } from "../store/useConfigStore";
 
 /**
  * Watches the user's text and triggers AI commentary periodically.
@@ -75,6 +76,9 @@ export function useWatcher(
         runningRef.current = true;
         onThinking && onThinking();
 
+        // Get response history from store for memory
+        const responseHistory = useConfigStore.getState().responseHistory || [];
+        
         // Call AI
         const commentary = await analyzeText(currentText, config, {
           onToolStart: () => onToolStart && onToolStart(),
@@ -85,7 +89,7 @@ export function useWatcher(
           onResponse: (r) => onResponse && onResponse(r),
           onSystemPrompt: (s) => onSystemPrompt && onSystemPrompt(s),
           onMeta: (m) => onMeta && onMeta(m),
-        });
+        }, responseHistory);
         if (commentary && typeof onComment === "function") {
           onComment(commentary);
           lastCommentAtRef.current = Date.now();

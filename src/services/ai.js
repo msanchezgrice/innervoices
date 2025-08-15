@@ -163,115 +163,6 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   return (text || "").trim();
 }
 
-// OpenAI chat with optional tool calling
-async function callOpenAIChat(prompt, config, { allowToolCalling = false } = {}, events) {
-  const { apiKey, model } = getOpenAIConfig(config);
-  if (!apiKey) throw new Error("Missing OpenAI API key");
-  const system = getSystemPrompt(config);
-
-  const baseMessages = [
-    { role: "system", content: system },
-    { role: "user", content: prompt },
-  ];
-
-  // Initial request
-  const tokenParam =
-    model?.startsWith("gpt-5") || model?.startsWith("gpt-4.1")
-      ? "max_completion_tokens"
-      : "max_tokens";
-
-  const allowTemp =
-    !(model?.startsWith("gpt-5") || model?.startsWith("gpt-4.1"));
-
-  const initBody = {
-    model,
-    messages: baseMessages,
-    ...(allowTemp ? { temperature: Number(config?.creativity ?? 0.7) } : {}),
-          [tokenParam]: Number(config?.maxTokens ?? 10000),
-    ...(allowToolCalling ? { tools: OPENAI_TOOLS } : {}),
-  };
-
-  if (config?.debugLogging) {
-    try { console.debug("[InnerVoices][AI][OpenAI][Chat] Init body:", initBody); } catch {}
-  }
-  let res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(initBody),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`OpenAI error ${res.status}: ${text}`);
-  }
-
-  const data = await res.json();
-  const msg = data.choices?.[0]?.message;
-  const toolCalls = msg?.tool_calls;
-
-  // Handle tool calling if requested
-  if (allowToolCalling && Array.isArray(toolCalls) && toolCalls.length > 0) {
-    events?.onToolStart?.();
-
-    try {
-      const toolResults = [];
-      for (const tc of toolCalls) {
-        const name = tc?.function?.name || tc?.name;
-        let args = {};
-        try {
-          args = JSON.parse(tc?.function?.arguments || "{}");
-        } catch {}
-        const result = await executeBuiltinTool(name, args);
-        toolResults.push({
-          role: "tool",
-          tool_call_id: tc.id,
-          name,
-          content: JSON.stringify(result),
-        });
-      }
-
-      // Follow-up message with tool outputs
-      const messages = [...baseMessages, msg, ...toolResults];
-
-      const followBody = {
-        model,
-        messages,
-        ...(allowTemp ? { temperature: Number(config?.creativity ?? 0.7) } : {}),
-        [tokenParam]: Number(config?.maxTokens ?? 10000),
-      };
-      if (config?.debugLogging) {
-        try { console.debug("[InnerVoices][AI][OpenAI][Chat] Follow-up body:", followBody); } catch {}
-      }
-      const followRes = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(followBody),
-      });
-
-      if (!followRes.ok) {
-        const text = await followRes.text().catch(() => "");
-        throw new Error(`OpenAI follow-up error ${followRes.status}: ${text}`);
-      }
-
-      const followData = await followRes.json();
-      const text =
-        followData.choices?.[0]?.message?.content?.trim() ||
-        data.choices?.[0]?.message?.content?.trim() ||
-        "";
-      return text;
-    } finally {
-      events?.onToolEnd?.();
-    }
-  }
-
-  return msg?.content?.trim() || "";
-}
 
 // Anthropic chat with optional tool calling
 async function callAnthropicChat(prompt, config, { allowToolCalling = false } = {}, events) {
@@ -377,9 +268,9 @@ async function callAnthropicChat(prompt, config, { allowToolCalling = false } = 
  * analyzeText(text, config, events?)
  * events?: { onToolStart?: () => void, onToolEnd?: () => void }
  */
-export async function analyzeText(text, config = {}, events) {
+export async function analyzeText(text, config = {}, events, responseHistory = []) {
   const context = detectContext(text);
-  const prompt = buildPrompt(text, config, context);
+  const prompt = buildPrompt(text, config, context, responseHistory);
 
   // Derive resolved system prompt and meta for tracing
   const system = getSystemPrompt(config);
@@ -433,7 +324,7 @@ export async function analyzeText(text, config = {}, events) {
             { allowToolCalling: allowTools },
             events
           )
-        : await callOpenAIChat(
+        : await callOpenAIResponses(
             prompt,
             config,
             { allowToolCalling: allowTools },

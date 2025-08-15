@@ -37,7 +37,7 @@ export const PERSONALITIES = {
   },
 };
 
-export function buildPrompt(text, config, context = []) {
+export function buildPrompt(text, config, context = [], responseHistory = []) {
   const lines = (text || "").split("\n");
   const lastLines = lines.slice(-15).join("\n");
 
@@ -53,6 +53,17 @@ export function buildPrompt(text, config, context = []) {
 
     let prompt = "";
     prompt += `The user just wrote:\n"""${lastLines}"""\n\n`;
+    
+    // Add response history for memory
+    if (Array.isArray(responseHistory) && responseHistory.length > 0) {
+      const recentResponses = responseHistory.slice(0, 5); // Last 5 responses
+      prompt += "Recent responses you've given:\n";
+      recentResponses.forEach((resp, i) => {
+        prompt += `${i + 1}. "${resp.response}"\n`;
+      });
+      prompt += "\nAvoid repeating similar advice or phrasing. Offer fresh perspective.\n\n";
+    }
+    
     if (contextHints) prompt += contextHints + " ";
     prompt += "Respond in 1–2 short sentences. Be encouraging, direct, and action-focused. ";
     prompt += "Reference a concrete detail from the text when helpful and end with ONE clear next action they can do now. ";
@@ -72,6 +83,16 @@ export function buildPrompt(text, config, context = []) {
 
   let prompt = `${baseLine}\n\n`;
   prompt += `The user just wrote:\n"""${lastLines}"""\n\n`;
+
+  // Add response history for memory
+  if (Array.isArray(responseHistory) && responseHistory.length > 0) {
+    const recentResponses = responseHistory.slice(0, 3); // Last 3 responses
+    prompt += "Recent responses you've given:\n";
+    recentResponses.forEach((resp, i) => {
+      prompt += `${i + 1}. "${resp.response}"\n`;
+    });
+    prompt += "\nAvoid repeating similar advice or phrasing. Offer fresh perspective.\n\n";
+  }
 
   if (context.includes("todos")) {
     prompt += "They're working on a task list. ";

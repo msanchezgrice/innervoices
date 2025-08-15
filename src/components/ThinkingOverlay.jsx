@@ -229,9 +229,9 @@ export default function ThinkingOverlay() {
           <div className="mt-2 flex items-center gap-2">
             <button
               className="text-[11px] px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
-              onClick={() => updateConfig({ showTraceOverlay: false })}
+              onClick={() => setCollapsed(true)}
             >
-              Hide
+              Minimize
             </button>
             <button
               className="text-[11px] px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
