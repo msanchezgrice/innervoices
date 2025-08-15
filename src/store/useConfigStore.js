@@ -10,8 +10,18 @@ const persisted = (() => {
   }
 })();
 
+const persistedHistory = (() => {
+  try {
+    const raw = localStorage.getItem("iv_response_history");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+})();
+
 export const useConfigStore = create((set, get) => ({
   config: persisted || DEFAULT_CONFIG,
+  responseHistory: persistedHistory,
   updateConfig: (partial) =>
     set((state) => {
       const next =
@@ -98,4 +108,30 @@ export const useConfigStore = create((set, get) => ({
         finishedAt: null,
       },
     }),
+
+  // Response History
+  addResponseToHistory: (response, model) => 
+    set((state) => {
+      const newEntry = {
+        id: Date.now() + Math.random(), // Simple unique ID
+        response,
+        model,
+        timestamp: Date.now(),
+      };
+      
+      const newHistory = [newEntry, ...state.responseHistory].slice(0, 100); // Keep last 100 responses
+      
+      try {
+        localStorage.setItem("iv_response_history", JSON.stringify(newHistory));
+      } catch {}
+      
+      return { responseHistory: newHistory };
+    }),
+
+  clearResponseHistory: () => {
+    try {
+      localStorage.removeItem("iv_response_history");
+    } catch {}
+    set({ responseHistory: [] });
+  },
 }));

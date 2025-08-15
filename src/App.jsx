@@ -10,9 +10,11 @@ import { useConfigStore } from "./store/useConfigStore.js";
 import { useNotesStore } from "./store/useNotesStore.js";
 import Landing from "./components/Landing.jsx";
 import OnboardingModal from "./components/OnboardingModal.jsx";
+import ResponseHistory from "./components/ResponseHistory.jsx";
 
 function App() {
   const [showSettings, setShowSettings] = useState(false);
+  const [showResponseHistory, setShowResponseHistory] = useState(false);
   const [showLanding, setShowLanding] = useState(() => {
     try {
       return !localStorage.getItem("iv_has_seen_landing");
@@ -84,6 +86,7 @@ function App() {
   const toggleActive = useConfigStore((s) => s.toggleActive);
   const setTrace = useConfigStore((s) => s.setTrace);
   const clearTrace = useConfigStore((s) => s.clearTrace);
+  const addResponseToHistory = useConfigStore((s) => s.addResponseToHistory);
 
   const { speak, cancel } = useVoice(config, {
     onStart: () => setOrbState("speaking"),
@@ -147,6 +150,10 @@ function App() {
     },
     onResponse: (r) => {
       setTrace((t) => ({ ...t, response: r || "" }));
+      if (r && r.trim()) {
+        const currentTrace = useConfigStore.getState().trace;
+        addResponseToHistory(r, currentTrace.model || "Unknown");
+      }
     },
     onSystemPrompt: (s) => {
       setTrace((t) => ({ ...t, systemPrompt: s || "" }));
@@ -203,7 +210,7 @@ function App() {
   return (
     <div className="w-screen h-screen flex">
       {config.showNotes && <NotesSidebar />}
-      <div className={`flex-1 h-full ${!config.showNotes ? "pl-12" : ""}`}>
+      <div className={`flex-1 h-full ${!config.showNotes ? "pl-12" : ""} ${showResponseHistory ? "pr-96" : ""}`}>
         <Notepad
           key={currentId || "notepad"}
           value={activeNote?.content || ""}
@@ -214,6 +221,7 @@ function App() {
       <Orb state={orbState} isActive={isActive} onClick={handleOrbClick} />
 
       {showSettings && <Settings />}
+      {showResponseHistory && <ResponseHistory onClose={() => setShowResponseHistory(false)} />}
       <ThinkingOverlay />
 
       {showLanding && (
@@ -242,17 +250,29 @@ function App() {
       )}
 
 
-      <button
-        className="fixed top-4 right-4 z-50 border rounded px-2.5 py-2 bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700"
-        onClick={() => setShowSettings((s) => !s)}
-        title="Settings"
-        aria-label="Settings"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-neutral-700 dark:text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.57-.905 3.314.839 2.409 2.41a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.065 2.573c.905 1.57-.839 3.314-2.41 2.409a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.065c-1.57.905-3.314-.839-2.409-2.41a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.065-2.573c-.905-1.57.839-3.314 2.41-2.409.98.565 2.19.139 2.572-1.065Z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </button>
+      <div className="fixed top-4 right-4 z-50 flex gap-2">
+        <button
+          className="border rounded px-2.5 py-2 bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700"
+          onClick={() => setShowResponseHistory((s) => !s)}
+          title="Response History"
+          aria-label="Response History"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-neutral-700 dark:text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+        <button
+          className="border rounded px-2.5 py-2 bg-white/80 dark:bg-neutral-800 shadow hover:bg-white dark:hover:bg-neutral-700"
+          onClick={() => setShowSettings((s) => !s)}
+          title="Settings"
+          aria-label="Settings"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-neutral-700 dark:text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.57-.905 3.314.839 2.409 2.41a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.065 2.573c.905 1.57-.839 3.314-2.41 2.409a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.065c-1.57.905-3.314-.839-2.409-2.41a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.065-2.573c-.905-1.57.839-3.314 2.41-2.409.98.565 2.19.139 2.572-1.065Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

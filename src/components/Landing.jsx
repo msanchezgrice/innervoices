@@ -81,9 +81,9 @@ export default function Landing({ onStart = () => {}, onShowSetup = () => {} }) 
           {/* YC Quote */}
           <div className="bg-gray-50 dark:bg-neutral-800 border-l-4 border-orange-500 p-4 max-w-2xl mx-auto mb-8 text-left">
             <p className="text-gray-700 dark:text-neutral-200 italic">
-              "The only way to win is to learn faster than anyone else. Build product, talk to users, iterate. That's it."
+              "The only way to win is to learn faster than anyone else."
             </p>
-            <p className="text-sm text-gray-500 dark:text-neutral-400 mt-2">— Paul Graham, Y Combinator</p>
+            <p className="text-sm text-gray-500 dark:text-neutral-400 mt-2">— Eric Ries, The Lean Startup</p>
           </div>
 
           {/* Live Demo Preview */}
@@ -136,15 +136,25 @@ export default function Landing({ onStart = () => {}, onShowSetup = () => {} }) 
 
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { icon: "🚀", title: '"Launch Now"', quote: "If you're not embarrassed by your first version, you launched too late.", author: "Reid Hoffman, LinkedIn" },
-            { icon: "👥", title: '"Talk to Users"', quote: "The mom test: Talk about their life, not your idea. Facts, not opinions.", author: "Rob Fitzpatrick" },
-            { icon: "🎯", title: `"Do Things That Don't Scale"`, quote: "Recruit users one by one. Delight them. Then figure out how to scale.", author: "Paul Graham, YC" },
+            { icon: "🚀", quote: "If you're not embarrassed by your first version, you launched too late.", author: "Reid Hoffman, LinkedIn", title: "Launch Now" },
+            { icon: "👥", title: "Talk to Users", quote: "The mom test: Talk about their life, not your idea. Facts, not opinions.", author: "Rob Fitzpatrick" },
+            { icon: "🎯", title: "Do Things That Don't Scale", quote: "Recruit users one by one. Delight them. Then figure out how to scale.", author: "Paul Graham, YC" },
           ].map((card, i) => (
             <div key={i} className="bg-white dark:bg-neutral-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-neutral-800">
               <div className="text-orange-500 text-2xl mb-3">{card.icon}</div>
-              <h3 className="font-bold mb-2">{card.title}</h3>
-              <p className="text-gray-600 dark:text-neutral-300 text-sm mb-3">{card.quote}</p>
-              <p className="text-xs text-gray-500 dark:text-neutral-500 italic">— {card.author}</p>
+              {i === 0 ? (
+                <>
+                  <p className="text-gray-600 dark:text-neutral-300 text-sm mb-3 italic">{card.quote}</p>
+                  <p className="text-xs text-gray-500 dark:text-neutral-500 mb-3">— {card.author}</p>
+                  <h3 className="font-bold">{card.title}</h3>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-bold mb-2">{card.title}</h3>
+                  <p className="text-gray-600 dark:text-neutral-300 text-sm mb-3">{card.quote}</p>
+                  <p className="text-xs text-gray-500 dark:text-neutral-500 italic">— {card.author}</p>
+                </>
+              )}
             </div>
           ))}
         </div>

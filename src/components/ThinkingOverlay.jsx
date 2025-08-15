@@ -15,6 +15,7 @@ export default function ThinkingOverlay() {
   const ref = useRef(null);
   const startRef = useRef({ mouseX: 0, mouseY: 0, x: 16, y: 16 });
   const [dragging, setDragging] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const next = config.overlayPosition || null;
@@ -109,15 +110,28 @@ export default function ThinkingOverlay() {
     <div ref={ref} className={containerCls} style={style}>
       <div
         className={clsx(
-          "cursor-move px-3 py-2 rounded-t-md",
+          "cursor-move px-3 py-2",
+          collapsed ? "rounded-md" : "rounded-t-md",
           "bg-neutral-100/70 dark:bg-neutral-800/70"
         )}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
         <div className="flex items-center justify-between gap-3">
-          <div className="font-semibold">
-            Trace
+          <div className="flex items-center gap-2">
+            <button
+              className="text-[10px] hover:bg-neutral-200/50 dark:hover:bg-neutral-700/50 rounded p-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollapsed(!collapsed);
+              }}
+              title={collapsed ? "Expand" : "Collapse"}
+            >
+              {collapsed ? "▶" : "▼"}
+            </button>
+            <div className="font-semibold">
+              Trace
+            </div>
           </div>
           <div
             className={clsx("px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide", statusBadgeCls)}
@@ -129,95 +143,106 @@ export default function ThinkingOverlay() {
         {dragging && <div className="text-[10px] text-neutral-500 mt-1">Dragging…</div>}
       </div>
 
-      <div className="px-3 py-2 max-w-[420px] max-h-[40vh] overflow-auto">
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <div className="text-[10px] text-neutral-500">Provider</div>
-            <div>{trace.provider || "-"}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-neutral-500">Model</div>
-            <div>{trace.model || "-"}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-neutral-500">Started</div>
-            <div>{trace.startedAt ? new Date(trace.startedAt).toLocaleTimeString() : "-"}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-neutral-500">Finished</div>
-            <div>{trace.finishedAt ? new Date(trace.finishedAt).toLocaleTimeString() : "-"}</div>
+      {collapsed ? (
+        <div className="px-3 py-2 max-w-[420px]">
+          <div className="mb-2">
+            <div className="text-[10px] text-neutral-500">Response</div>
+            <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700 max-h-[100px] overflow-auto">
+              {trace.response || "-"}
+            </pre>
           </div>
         </div>
-
-        {/* System Prompt */}
-        <div className="mb-2">
-          <div className="text-[10px] text-neutral-500">System Prompt</div>
-          <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700">
-            {trace.systemPrompt || "-"}
-          </pre>
-        </div>
-
-        {/* Variables */}
-        <div className="mb-2">
-          <div className="text-[10px] text-neutral-500">Variables</div>
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
+      ) : (
+        <div className="px-3 py-2 max-w-[420px] max-h-[40vh] overflow-auto">
+          <div className="grid grid-cols-2 gap-2 mb-2">
             <div>
-              <span className="text-neutral-500">Personality</span>: {trace.meta?.personality || "-"}
+              <div className="text-[10px] text-neutral-500">Provider</div>
+              <div>{trace.provider || "-"}</div>
             </div>
             <div>
-              <span className="text-neutral-500">Tone</span>: {trace.meta?.tone || "-"}
+              <div className="text-[10px] text-neutral-500">Model</div>
+              <div>{trace.model || "-"}</div>
             </div>
             <div>
-              <span className="text-neutral-500">Creativity</span>: {trace.meta?.creativity ?? "-"}
+              <div className="text-[10px] text-neutral-500">Started</div>
+              <div>{trace.startedAt ? new Date(trace.startedAt).toLocaleTimeString() : "-"}</div>
             </div>
             <div>
-              <span className="text-neutral-500">Max Tokens</span>: {trace.meta?.maxTokens ?? "-"}
-            </div>
-            <div>
-              <span className="text-neutral-500">Comment Interval</span>: {trace.meta?.commentInterval ?? "-"}
-            </div>
-            <div>
-              <span className="text-neutral-500">Comment Probability</span>: {trace.meta?.commentProbability ?? "-"}
+              <div className="text-[10px] text-neutral-500">Finished</div>
+              <div>{trace.finishedAt ? new Date(trace.finishedAt).toLocaleTimeString() : "-"}</div>
             </div>
           </div>
-        </div>
 
-        <div className="mb-2">
-          <div className="text-[10px] text-neutral-500">Prompt</div>
-          <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700">
-            {trace.prompt || "-"}
-          </pre>
-        </div>
-
-        <div className="mb-2">
-          <div className="text-[10px] text-neutral-500">Response</div>
-          <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700">
-            {trace.response || "-"}
-          </pre>
-        </div>
-
-        {trace.error && (
-          <div className="text-[11px] text-red-600 dark:text-red-400">
-            Error: {String(trace.error)}
+          {/* System Prompt */}
+          <div className="mb-2">
+            <div className="text-[10px] text-neutral-500">System Prompt</div>
+            <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700">
+              {trace.systemPrompt || "-"}
+            </pre>
           </div>
-        )}
 
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            className="text-[11px] px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
-            onClick={() => updateConfig({ showTraceOverlay: false })}
-          >
-            Hide
-          </button>
-          <button
-            className="text-[11px] px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
-            onClick={() => updateConfig({ overlayPosition: null })}
-            title="Reset position to default"
-          >
-            Reset position
-          </button>
+          {/* Variables */}
+          <div className="mb-2">
+            <div className="text-[10px] text-neutral-500">Variables</div>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <span className="text-neutral-500">Personality</span>: {trace.meta?.personality || "-"}
+              </div>
+              <div>
+                <span className="text-neutral-500">Tone</span>: {trace.meta?.tone || "-"}
+              </div>
+              <div>
+                <span className="text-neutral-500">Creativity</span>: {trace.meta?.creativity ?? "-"}
+              </div>
+              <div>
+                <span className="text-neutral-500">Max Tokens</span>: {trace.meta?.maxTokens ?? "-"}
+              </div>
+              <div>
+                <span className="text-neutral-500">Comment Interval</span>: {trace.meta?.commentInterval ?? "-"}
+              </div>
+              <div>
+                <span className="text-neutral-500">Comment Probability</span>: {trace.meta?.commentProbability ?? "-"}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-2">
+            <div className="text-[10px] text-neutral-500">Prompt</div>
+            <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700">
+              {trace.prompt || "-"}
+            </pre>
+          </div>
+
+          <div className="mb-2">
+            <div className="text-[10px] text-neutral-500">Response</div>
+            <pre className="whitespace-pre-wrap text-[11px] bg-neutral-50 dark:bg-neutral-800/60 p-2 rounded border border-neutral-200 dark:border-neutral-700">
+              {trace.response || "-"}
+            </pre>
+          </div>
+
+          {trace.error && (
+            <div className="text-[11px] text-red-600 dark:text-red-400">
+              Error: {String(trace.error)}
+            </div>
+          )}
+
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              className="text-[11px] px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+              onClick={() => updateConfig({ showTraceOverlay: false })}
+            >
+              Hide
+            </button>
+            <button
+              className="text-[11px] px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
+              onClick={() => updateConfig({ overlayPosition: null })}
+              title="Reset position to default"
+            >
+              Reset position
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

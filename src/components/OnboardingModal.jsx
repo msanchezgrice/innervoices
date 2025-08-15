@@ -21,7 +21,7 @@ export default function OnboardingModal({
 }) {
   const [step, setStep] = useState(0);
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("gpt-4o-mini");
+  const [model, setModel] = useState("gpt-5-mini");
   const steps = [
     { title: "Welcome to ShipMode", subtitle: "Your AI cofounder that keeps you shipping." },
     { title: "Set up your API key", subtitle: "Enter your OpenAI API key and choose a model." },

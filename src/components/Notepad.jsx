@@ -5,7 +5,8 @@ export default function Notepad({ value, onChange }) {
       placeholder="Start writing... ShipMode is listening"
       value={value || ""}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-full p-8 text-lg leading-relaxed bg-transparent resize-none outline-none placeholder-neutral-500 dark:placeholder-neutral-400"
+      className="w-full h-full p-8 text-lg leading-relaxed bg-transparent resize-none outline-none placeholder-neutral-500 dark:placeholder-neutral-400 break-words"
+      style={{ wordWrap: "break-word", overflowWrap: "break-word" }}
       spellCheck={false}
     />
   );
