@@ -123,6 +123,7 @@ export const useConfigStore = create((set, get) => ({
         id: Date.now() + Math.random(), // Simple unique ID
         response,
         model,
+        noteId, // Include the noteId in the entry
         timestamp: Date.now(),
       };
       
