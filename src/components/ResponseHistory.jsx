@@ -68,7 +68,16 @@ export default function ResponseHistory({ onClose = () => {}, noteId = null }) {
           responseHistory.map((item, index) => (
             <div
               key={item.id || index}
-              className="bg-neutral-50 dark:bg-neutral-800 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700"
+              className="bg-neutral-50 dark:bg-neutral-800 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-750 transition-colors"
+              onClick={() => {
+                // Find and select the note with this ID
+                const targetNote = notes.find(n => n.id === item.noteId);
+                if (targetNote) {
+                  useNotesStore.getState().selectNote(item.noteId);
+                  // Close the response history panel after selecting
+                  onClose();
+                }
+              }}
             >
               {/* Timestamp */}
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
@@ -81,11 +90,14 @@ export default function ResponseHistory({ onClose = () => {}, noteId = null }) {
               </div>
 
               {/* Metadata */}
-              {item.model && (
-                <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-2 border-t border-neutral-200 dark:border-neutral-700 pt-2">
-                  {item.model}
+              <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 mt-2 border-t border-neutral-200 dark:border-neutral-700 pt-2">
+                <div>
+                  {item.model && <span>{item.model}</span>}
                 </div>
-              )}
+                <div className="font-mono text-[10px]">
+                  Note ID: {item.noteId || 'unknown'}
+                </div>
+              </div>
             </div>
           ))
         )}
