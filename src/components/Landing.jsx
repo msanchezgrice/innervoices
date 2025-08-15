@@ -2,7 +2,7 @@ import React from "react";
 
 export default function Landing({ onStart = () => {}, onShowSetup = () => {} }) {
   return (
-    <div className="bg-white text-gray-900 dark:bg-neutral-900 dark:text-neutral-100">
+    <div className="bg-white text-gray-900 dark:bg-neutral-900 dark:text-neutral-100 overflow-y-auto overflow-x-hidden h-screen" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Utility styles ported from provided HTML */}
       <style>{`
         .gradient-text {

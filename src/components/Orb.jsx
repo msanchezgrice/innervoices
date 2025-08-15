@@ -132,7 +132,7 @@ export default function Orb({ state = "idle", isActive = true, onClick }) {
         onClick={onClick}
         title="Click: Start/Pause • Alt+Click: Mute/Unmute • Drag to move"
         role="button"
-        aria-label="InnerVoices Orb"
+        aria-label="ShipMode Orb"
       >
         {/* Subtle inner dot */}
         <div className="w-3 h-3 rounded-full bg-white/70" />

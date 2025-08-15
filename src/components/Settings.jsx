@@ -85,7 +85,7 @@ export default function Settings() {
 
   return (
     <div className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-neutral-900 shadow-lg p-6 border-l border-neutral-200 dark:border-neutral-800 overflow-y-auto z-40">
-      <h2 className="text-xl font-bold mb-4">InnerVoice Settings</h2>
+      <h2 className="text-xl font-bold mb-4">ShipMode Settings</h2>
 
       {/* Personality */}
       <div className="mb-6">
@@ -529,7 +529,7 @@ export default function Settings() {
           className="mt-1 text-xs px-2 py-1 border rounded bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700"
           onClick={() =>
             speak(
-              "Hi, this is your InnerVoice. Testing your current voice settings."
+              "Hi, this is ShipMode. Testing your current voice settings."
             )
           }
         >
@@ -582,7 +582,7 @@ export default function Settings() {
         </div>
 
         <div className="text-[11px] text-neutral-500 mt-3">
-          Tip: Click orb to Start/Pause. Alt+Click orb to Mute/Unmute.
+          Note: When Ship Mode is enabled, custom system prompts are overridden.
         </div>
       </div>
     </div>

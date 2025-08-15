@@ -142,7 +142,7 @@ function App() {
         }, 2000);
       }
       if (config.debugLogging) {
-        console.debug("[InnerVoices][App] API end in", ms, "ms ok:", ok);
+        console.debug("[ShipMode][App] API end in", ms, "ms ok:", ok);
       }
     },
     onResponse: (r) => {

@@ -23,7 +23,7 @@ export default function OnboardingModal({
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("gpt-4o-mini");
   const steps = [
-    { title: "Welcome", subtitle: "Your AI writing companion that thinks alongside you." },
+    { title: "Welcome to ShipMode", subtitle: "Your AI cofounder that keeps you shipping." },
     { title: "Set up your API key", subtitle: "Enter your OpenAI API key and choose a model." },
     { title: "Meet the Orb", subtitle: "The Orb lives at the bottom center. Click to Start/Pause." },
   ];
@@ -77,7 +77,7 @@ export default function OnboardingModal({
           {step === 0 && (
             <div className="space-y-3">
               <p className="text-neutral-700 dark:text-neutral-300">
-                InnerVoices provides ambient commentary while you write. It runs entirely in your browser and uses your chosen model via API.
+                ShipMode provides focused guidance while you build. It runs entirely in your browser and uses your chosen model via API.
               </p>
               <ul className="list-disc pl-5 text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
                 <li>Bring your own OpenAI API key</li>
