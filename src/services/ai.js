@@ -164,6 +164,16 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   let data;
   try {
     data = await res.json();
+    console.log("[OpenAI] Full response structure:", {
+      hasOutput: !!data?.output,
+      outputLength: data?.output?.length || 0,
+      hasChoices: !!data?.choices,
+      choicesLength: data?.choices?.length || 0,
+      hasContent: !!data?.content,
+      dataKeys: Object.keys(data || {}),
+      firstOutput: data?.output?.[0],
+      firstChoice: data?.choices?.[0]
+    });
     console.log("[OpenAI] Response data:", JSON.stringify(data).substring(0, 500));
   } catch (parseError) {
     console.error("[OpenAI] Failed to parse response:", parseError);
@@ -237,20 +247,64 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     }
   }
 
-  const result = extractTextFromResponsesOutput(output);
-  console.log("[OpenAI] Extracted text:", result?.substring(0, 100) + "...");
+  // Try extracting from output first, then fallback to full data
+  let result = extractTextFromResponsesOutput(output);
+  
+  if (!result && data) {
+    console.log("[OpenAI] No text in output, trying full data object");
+    result = extractTextFromResponsesOutput(data);
+  }
+  
+  console.log("[OpenAI] Extracted text:", result ? (result.substring(0, 100) + "...") : "EMPTY");
   return result;
 }
 
 /**
  * Extract text from Responses API output format
  */
-function extractTextFromResponsesOutput(output) {
-  if (!Array.isArray(output)) return "";
+function extractTextFromResponsesOutput(data) {
+  console.log("[extractText] Attempting to extract from:", {
+    isArray: Array.isArray(data),
+    dataType: typeof data,
+    hasLength: data?.length,
+    firstItem: data?.[0]
+  });
   
-  for (const item of output) {
+  // If data is the full response object, try to get output field
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    // Check for output field (Responses API)
+    if (data.output) {
+      return extractTextFromResponsesOutput(data.output);
+    }
+    
+    // Check for choices field (Chat Completions fallback)
+    if (data.choices && data.choices[0]?.message?.content) {
+      console.log("[extractText] Found text in choices[0].message.content");
+      return data.choices[0].message.content.trim();
+    }
+    
+    // Check for direct content field
+    if (data.content && typeof data.content === 'string') {
+      console.log("[extractText] Found text in direct content field");
+      return data.content.trim();
+    }
+    
+    // Check for text field
+    if (data.text && typeof data.text === 'string') {
+      console.log("[extractText] Found text in direct text field");
+      return data.text.trim();
+    }
+  }
+  
+  if (!Array.isArray(data)) {
+    console.log("[extractText] Data is not an array, returning empty");
+    return "";
+  }
+  
+  for (const item of data) {
     // Check for direct text output (most common in Responses API)
     if (item?.type === "text" && typeof item?.text === "string") {
+      console.log("[extractText] Found text in item with type='text'");
       return item.text.trim();
     }
     
@@ -258,16 +312,25 @@ function extractTextFromResponsesOutput(output) {
     if (item?.type === "message" && Array.isArray(item?.content)) {
       const textPart = item.content.find(c => c?.type === "text" && typeof c?.text === "string");
       if (textPart?.text) {
+        console.log("[extractText] Found text in message.content array");
         return textPart.text.trim();
       }
     }
     
     // Handle string output directly (some models may return this)
     if (typeof item === "string") {
+      console.log("[extractText] Found direct string item");
       return item.trim();
+    }
+    
+    // Check for content field in item
+    if (item?.content && typeof item.content === "string") {
+      console.log("[extractText] Found text in item.content");
+      return item.content.trim();
     }
   }
   
+  console.log("[extractText] No text found, returning empty");
   return "";
 }
 
