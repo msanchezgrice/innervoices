@@ -80,6 +80,7 @@ export function useWatcher(
         // Get response history from store for memory (note-specific)
         const getResponseHistoryForNote = useConfigStore.getState().getResponseHistoryForNote;
         const responseHistory = noteId ? getResponseHistoryForNote(noteId) : [];
+        console.log("[Watcher] Using noteId:", noteId, "with", responseHistory.length, "previous responses");
         
         // Call AI
         const commentary = await analyzeText(currentText, config, {

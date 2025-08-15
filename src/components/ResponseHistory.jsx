@@ -17,8 +17,13 @@ function formatTimeAgo(timestamp) {
 export default function ResponseHistory({ onClose = () => {}, noteId = null }) {
   const getResponseHistoryForNote = useConfigStore((s) => s.getResponseHistoryForNote);
   const clearResponseHistory = useConfigStore((s) => s.clearResponseHistory);
+  const allHistory = useConfigStore((s) => s.responseHistory);
   const responseHistory = getResponseHistoryForNote(noteId) || [];
   const scrollRef = useRef(null);
+  
+  console.log("[ResponseHistory] Rendering for noteId:", noteId);
+  console.log("[ResponseHistory] All history keys:", Object.keys(allHistory || {}));
+  console.log("[ResponseHistory] Current note history length:", responseHistory.length);
 
   // Auto-scroll to top when new responses are added
   useEffect(() => {

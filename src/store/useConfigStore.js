@@ -112,7 +112,12 @@ export const useConfigStore = create((set, get) => ({
   // Response History (per note)
   addResponseToHistory: (response, model, noteId) => 
     set((state) => {
-      if (!noteId) return state; // Skip if no note ID provided
+      console.log("[Store] addResponseToHistory called with noteId:", noteId);
+      
+      if (!noteId) {
+        console.log("[Store] No noteId provided, skipping");
+        return state; // Skip if no note ID provided
+      }
       
       const newEntry = {
         id: Date.now() + Math.random(), // Simple unique ID
@@ -122,12 +127,17 @@ export const useConfigStore = create((set, get) => ({
       };
       
       const currentNoteHistory = state.responseHistory[noteId] || [];
+      console.log("[Store] Current history for note", noteId, "has", currentNoteHistory.length, "items");
+      
       const newNoteHistory = [newEntry, ...currentNoteHistory].slice(0, 100); // Keep last 100 responses per note
       
       const newHistory = {
         ...state.responseHistory,
         [noteId]: newNoteHistory
       };
+      
+      console.log("[Store] New history object has keys:", Object.keys(newHistory));
+      console.log("[Store] Note", noteId, "now has", newNoteHistory.length, "responses");
       
       try {
         localStorage.setItem("iv_response_history", JSON.stringify(newHistory));

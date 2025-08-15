@@ -164,7 +164,15 @@ function App() {
       setTrace((t) => ({ ...t, response: r || "" }));
       if (r && r.trim() && currentId) {
         const currentTrace = useConfigStore.getState().trace;
+        console.log("[App] Adding response to history for note:", currentId, "model:", currentTrace.model);
         addResponseToHistory(r, currentTrace.model || "Unknown", currentId);
+      } else {
+        console.log("[App] Not adding response to history - missing data:", {
+          hasResponse: !!r,
+          responseLength: r?.length,
+          hasNoteId: !!currentId,
+          noteId: currentId
+        });
       }
     },
     onSystemPrompt: (s) => {
