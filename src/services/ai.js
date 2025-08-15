@@ -164,6 +164,12 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   let data;
   try {
     data = await res.json();
+    
+    // Log the entire first output item to understand its structure
+    if (data?.output && data.output.length > 0) {
+      console.log("[OpenAI] First output item full content:", JSON.stringify(data.output[0]));
+    }
+    
     console.log("[OpenAI] Full response structure:", {
       hasOutput: !!data?.output,
       outputLength: data?.output?.length || 0,
@@ -171,8 +177,11 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
       choicesLength: data?.choices?.length || 0,
       hasContent: !!data?.content,
       dataKeys: Object.keys(data || {}),
-      firstOutput: data?.output?.[0],
-      firstChoice: data?.choices?.[0]
+      firstOutputKeys: data?.output?.[0] ? Object.keys(data.output[0]) : [],
+      firstOutputType: data?.output?.[0]?.type,
+      firstOutputContent: data?.output?.[0]?.content,
+      firstOutputText: data?.output?.[0]?.text,
+      firstOutputMessage: data?.output?.[0]?.message
     });
     console.log("[OpenAI] Response data:", JSON.stringify(data).substring(0, 500));
   } catch (parseError) {
@@ -180,9 +189,15 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     throw new Error(`Failed to parse OpenAI response: ${parseError.message}`);
   }
   
+  // Check for direct text field first (Responses API sometimes puts it here)
+  if (data?.text && typeof data.text === 'string') {
+    console.log("[OpenAI] Found text in direct data.text field");
+    return data.text.trim();
+  }
+  
   // Handle tool calls if present
   const output = data?.output || [];
-  const toolCalls = output.filter(item => item?.type === "function");
+  const toolCalls = output.filter(item => item?.type === "function_call");
   
   if (toolCalls.length > 0) {
     console.log("[OpenAI] Tool calls detected:", toolCalls.length);
@@ -194,33 +209,32 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     try {
       const toolResults = [];
       for (const tc of toolCalls) {
-        const name = tc?.function?.name;
+        // For function_call type, the properties are directly on the object
+        const name = tc?.name;
         let args = {};
         try {
-          args = JSON.parse(tc?.function?.arguments || "{}");
+          args = JSON.parse(tc?.arguments || "{}");
         } catch {}
+        
+        console.log("[OpenAI] Executing tool:", name, "with args:", args);
         const result = await executeBuiltinTool(name, args);
+        
         toolResults.push({
-          type: "function",
-          function: {
-            name,
-            // Pass result as raw object/value for better model parsing
-            result: result.ok ? result.result : result.error,
-          },
-          id: tc.id,
+          type: "function_result",
+          call_id: tc.call_id,
+          result: JSON.stringify(result),
         });
       }
 
-      // Follow-up call with tool results
+      // Follow-up call with tool results - append to output
       const followBody = {
         model,
         instructions: system,
         input: prompt,  // Keep as plain string
         max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
-        context: {
-          previous_output: output,
-          tool_results: toolResults,
-        },
+        output: [...output, ...toolResults],  // Append tool results to output
+        tools: OPENAI_TOOLS,  // Keep tools available
+        tool_choice: "none"  // Don't call more tools
       };
 
       console.log("[OpenAI] Making follow-up call with tool results");
@@ -241,6 +255,14 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
       }
 
       const followData = await followRes.json();
+      console.log("[OpenAI] Follow-up response:", JSON.stringify(followData).substring(0, 500));
+      
+      // Check for direct text field first
+      if (followData?.text && typeof followData.text === 'string') {
+        console.log("[OpenAI] Found text in follow-up data.text field");
+        return followData.text.trim();
+      }
+      
       return extractTextFromResponsesOutput(followData?.output || []);
     } finally {
       events?.onToolEnd?.();
@@ -267,7 +289,9 @@ function extractTextFromResponsesOutput(data) {
     isArray: Array.isArray(data),
     dataType: typeof data,
     hasLength: data?.length,
-    firstItem: data?.[0]
+    firstItemKeys: data?.[0] ? Object.keys(data[0]) : 'N/A',
+    firstItemType: data?.[0]?.type,
+    firstItemContent: data?.[0]?.content ? (typeof data[0].content === 'string' ? data[0].content.substring(0, 50) : 'not a string') : 'no content'
   });
   
   // If data is the full response object, try to get output field

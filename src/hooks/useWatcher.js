@@ -92,13 +92,18 @@ export function useWatcher(
           onSystemPrompt: (s) => onSystemPrompt && onSystemPrompt(s),
           onMeta: (m) => onMeta && onMeta(m),
         }, responseHistory);
+        
+        // ALWAYS update snapshot to prevent infinite loop
+        lastSnapshotRef.current = currentText;
+        
         if (commentary && typeof onComment === "function") {
           console.log("[Watcher] Commentary generated:", commentary?.substring(0, 100) + "...");
           onComment(commentary);
           lastCommentAtRef.current = Date.now();
-          lastSnapshotRef.current = currentText;
         } else {
           console.log("[Watcher] No commentary generated or no onComment handler");
+          // Still update last comment time to prevent rapid retries
+          lastCommentAtRef.current = Date.now();
         }
       } catch (e) {
         console.error("[Watcher] Analysis error:", {
