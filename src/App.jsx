@@ -85,7 +85,15 @@ function App() {
 
   useWatcher(activeNote?.content || "", config, {
     onThinking: () => {
+      console.log("[App] Watcher triggered - Starting to think", {
+        contentLength: activeNote?.content?.length || 0,
+        orbState: useConfigStore.getState().orbState,
+        isActive: useConfigStore.getState().isActive,
+        timestamp: new Date().toISOString()
+      });
+      
       if (useConfigStore.getState().orbState !== "muted") {
+        console.log("[App] Setting orb to thinking state");
         setOrbState("thinking");
       }
       clearTrace();
@@ -117,25 +125,39 @@ function App() {
       setTrace((t) => ({ ...t, prompt: p }));
     },
     onApiStart: ({ provider, model }) => {
+      console.log("[App] API Start - Orb should be thinking", {
+        provider,
+        model,
+        currentOrbState: useConfigStore.getState().orbState,
+        timestamp: new Date().toISOString()
+      });
       setTrace((t) => ({ ...t, provider: provider || "", model: model || "", thinking: true }));
     },
     onApiEnd: ({ ok, error, ms }) => {
+      console.log("[App] API End", {
+        ok,
+        error,
+        responseTime: ms,
+        currentOrbState: useConfigStore.getState().orbState,
+        timestamp: new Date().toISOString()
+      });
+      
       setTrace((t) => ({
         ...t,
         finishedAt: Date.now(),
         thinking: false,
         error: ok ? null : (error || "Unknown API error"),
       }));
+      
       if (!ok && useConfigStore.getState().orbState !== "muted") {
+        console.log("[App] Setting orb to error state");
         setOrbState("error");
         setTimeout(() => {
           if (useConfigStore.getState().orbState === "error") {
+            console.log("[App] Resetting orb from error to idle");
             setOrbState("idle");
           }
         }, 2000);
-      }
-      if (config.debugLogging) {
-        console.debug("[ShipMode][App] API end in", ms, "ms ok:", ok);
       }
     },
     onResponse: (r) => {
@@ -152,13 +174,32 @@ function App() {
       setTrace((t) => ({ ...t, meta: { ...(t?.meta || {}), ...(m || {}) } }));
     },
     onComment: (commentary) => {
-      if (useConfigStore.getState().orbState === "muted") return;
+      console.log("[App] Comment received", {
+        commentLength: commentary?.length || 0,
+        orbState: useConfigStore.getState().orbState,
+        voiceEnabled: config.voiceEnabled,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (useConfigStore.getState().orbState === "muted") {
+        console.log("[App] Orb is muted, skipping comment");
+        return;
+      }
+      
       setOrbState("ready");
       if (config.voiceEnabled) {
+        console.log("[App] Speaking comment via TTS");
         speak(commentary);
       }
     },
     onError: (e) => {
+      console.error("[App] Error event", {
+        error: e?.message || String(e),
+        stack: e?.stack,
+        orbState: useConfigStore.getState().orbState,
+        timestamp: new Date().toISOString()
+      });
+      
       setTrace((t) => ({ ...t, error: e?.message || String(e), thinking: false, tooling: false }));
       if (useConfigStore.getState().orbState !== "muted") {
         setOrbState("error");

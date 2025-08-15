@@ -93,15 +93,23 @@ export function useWatcher(
           onMeta: (m) => onMeta && onMeta(m),
         }, responseHistory);
         if (commentary && typeof onComment === "function") {
+          console.log("[Watcher] Commentary generated:", commentary?.substring(0, 100) + "...");
           onComment(commentary);
           lastCommentAtRef.current = Date.now();
           lastSnapshotRef.current = currentText;
+        } else {
+          console.log("[Watcher] No commentary generated or no onComment handler");
         }
       } catch (e) {
-        // Swallow errors; the AI service already logs warnings.
+        console.error("[Watcher] Analysis error:", {
+          error: e?.message || String(e),
+          stack: e?.stack,
+          timestamp: new Date().toISOString()
+        });
         onError && onError(e);
       } finally {
         runningRef.current = false;
+        console.log("[Watcher] Analysis complete");
       }
     };
 

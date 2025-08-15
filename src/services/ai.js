@@ -94,12 +94,19 @@ async function executeBuiltinTool(name, args) {
  */
 async function callOpenAIResponses(prompt, config, { allowToolCalling = false } = {}, events) {
   const { apiKey, model } = getOpenAIConfig(config);
+  
+  // Always log critical info for debugging
+  console.log("[OpenAI] Starting API call", {
+    model,
+    hasApiKey: !!apiKey,
+    apiKeyLength: apiKey?.length || 0,
+    allowToolCalling,
+    timestamp: new Date().toISOString()
+  });
+  
   if (!apiKey) throw new Error("Missing OpenAI API key");
   if (!apiKey.trim()) throw new Error("OpenAI API key is empty");
-  if (config?.debugLogging) {
-    console.debug("[InnerVoices][AI][OpenAI] API Key length:", apiKey.length);
-    console.debug("[InnerVoices][AI][OpenAI] API Key starts with:", apiKey.substring(0, 7));
-  }
+  
   const system = getSystemPrompt(config);
 
   // Use Responses API
@@ -115,33 +122,61 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     } : {}),
   };
 
-  if (config?.debugLogging) {
-    try { console.debug("[InnerVoices][AI][OpenAI][Responses] Body:", body); } catch {}
+  // Always log request details for debugging
+  console.log("[OpenAI] Request body:", {
+    ...body,
+    instructions: body.instructions?.substring(0, 100) + "...",
+    input: body.input?.substring(0, 100) + "..."
+  });
+  
+  const url = "https://api.openai.com/v1/responses";
+  console.log("[OpenAI] Calling:", url);
+  
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "OpenAI-Beta": "responses-api-v1"  // Required beta header for Responses API
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (fetchError) {
+    console.error("[OpenAI] Fetch error:", fetchError);
+    throw new Error(`Network error calling OpenAI: ${fetchError.message}`);
   }
   
-  let res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "OpenAI-Beta": "responses-api-v1"  // Required beta header for Responses API
-    },
-    body: JSON.stringify(body),
-  });
+  console.log("[OpenAI] Response status:", res.status, res.statusText);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    if (config?.debugLogging) {
-      console.error("[InnerVoices][AI][OpenAI][Responses] HTTP", res.status, "error:", text);
-    }
+    console.error("[OpenAI] API Error:", {
+      status: res.status,
+      statusText: res.statusText,
+      response: text,
+      timestamp: new Date().toISOString()
+    });
     throw new Error(`OpenAI Responses error ${res.status}: ${text}`);
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+    console.log("[OpenAI] Response data:", JSON.stringify(data).substring(0, 500));
+  } catch (parseError) {
+    console.error("[OpenAI] Failed to parse response:", parseError);
+    throw new Error(`Failed to parse OpenAI response: ${parseError.message}`);
+  }
   
   // Handle tool calls if present
   const output = data?.output || [];
   const toolCalls = output.filter(item => item?.type === "function");
+  
+  if (toolCalls.length > 0) {
+    console.log("[OpenAI] Tool calls detected:", toolCalls.length);
+  }
   
   if (allowToolCalling && toolCalls.length > 0) {
     events?.onToolStart?.();
@@ -178,6 +213,7 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
         },
       };
 
+      console.log("[OpenAI] Making follow-up call with tool results");
       const followRes = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
@@ -187,6 +223,7 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
         },
         body: JSON.stringify(followBody),
       });
+      console.log("[OpenAI] Follow-up response status:", followRes.status);
 
       if (!followRes.ok) {
         const text = await followRes.text().catch(() => "");
@@ -200,7 +237,9 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     }
   }
 
-  return extractTextFromResponsesOutput(output);
+  const result = extractTextFromResponsesOutput(output);
+  console.log("[OpenAI] Extracted text:", result?.substring(0, 100) + "...");
+  return result;
 }
 
 /**
@@ -338,6 +377,12 @@ async function callAnthropicChat(prompt, config, { allowToolCalling = false } = 
  * events?: { onToolStart?: () => void, onToolEnd?: () => void }
  */
 export async function analyzeText(text, config = {}, events, responseHistory = []) {
+  console.log("[analyzeText] Starting analysis", {
+    textLength: text?.length || 0,
+    hasResponseHistory: responseHistory?.length > 0,
+    timestamp: new Date().toISOString()
+  });
+  
   const context = detectContext(text);
   const prompt = buildPrompt(text, config, context, responseHistory);
 
@@ -377,12 +422,16 @@ export async function analyzeText(text, config = {}, events, responseHistory = [
     // Logging + events: prompt and API start
     events?.onPrompt?.(prompt);
     events?.onApiStart?.({ provider, model, promptLength: prompt?.length ?? 0 });
-    if (config?.debugLogging) {
-      console.debug("[InnerVoices][AI] Calling provider:", provider, "model:", model);
-      console.debug("[InnerVoices][AI] System Prompt:", system);
-      console.debug("[InnerVoices][AI] Prompt:", prompt);
-      console.debug("[InnerVoices][AI] Meta:", meta);
-    }
+    
+    // Always log for Vercel debugging
+    console.log("[analyzeText] Calling AI provider", {
+      provider,
+      model,
+      promptLength: prompt?.length || 0,
+      systemPromptLength: system?.length || 0,
+      allowTools: allowTools
+    });
+    
     const t0 = Date.now();
 
     const raw =
@@ -403,18 +452,29 @@ export async function analyzeText(text, config = {}, events, responseHistory = [
     const ms = Date.now() - t0;
     events?.onApiEnd?.({ provider, model, ms, ok: true });
     events?.onResponse?.(raw);
-    if (config?.debugLogging) {
-      console.debug("[InnerVoices][AI] Response in", ms + "ms:", raw);
-    }
+    
+    console.log("[analyzeText] AI response received", {
+      responseTime: ms,
+      responseLength: raw?.length || 0,
+      provider,
+      model
+    });
 
-    return truncateWords(raw, Number(config?.maxCommentLength ?? 200));
+    const truncated = truncateWords(raw, Number(config?.maxCommentLength ?? 200));
+    console.log("[analyzeText] Final output:", truncated?.substring(0, 100) + "...");
+    return truncated;
   } catch (err) {
     events?.onApiEnd?.({ provider, model, ms: 0, ok: false, error: err?.message || String(err) });
-    if (config?.debugLogging) {
-      console.error("[InnerVoices][AI] Error:", err);
-    } else {
-      console.warn("[InnerVoices] AI fallback due to error:", err?.message || err);
-    }
+    
+    // Always log errors for debugging
+    console.error("[analyzeText] AI Error", {
+      provider,
+      model,
+      error: err?.message || String(err),
+      stack: err?.stack,
+      timestamp: new Date().toISOString()
+    });
+    
     const examples = [
       "That's a really interesting point you're making.",
       "You're onto something here.",
@@ -422,6 +482,7 @@ export async function analyzeText(text, config = {}, events, responseHistory = [
       "That structure is getting clearer.",
     ];
     const pick = examples[Math.floor(Math.random() * examples.length)];
+    console.log("[analyzeText] Using fallback response:", pick);
     return pick;
   }
 }
