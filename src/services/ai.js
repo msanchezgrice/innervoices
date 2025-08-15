@@ -109,17 +109,18 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   
   const system = getSystemPrompt(config);
 
-  // Use Responses API
+  // Use Responses API - disable tools for now as they complicate the flow
   const body = {
     model,
     instructions: system,
     input: prompt,  // Keep as plain string - API doesn't accept array format yet
     // Ensure max_output_tokens is reasonable for all models
     max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
-    ...(allowToolCalling ? { 
-      tools: OPENAI_TOOLS,
-      tool_choice: "auto"  // Allow model to decide when to use tools
-    } : {}),
+    // Disable tools for now - they cause issues with follow-up calls
+    // ...(allowToolCalling ? { 
+    //   tools: OPENAI_TOOLS,
+    //   tool_choice: "auto"  // Allow model to decide when to use tools
+    // } : {}),
   };
 
   // Always log request details for debugging
@@ -195,79 +196,8 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
     return data.text.trim();
   }
   
-  // Handle tool calls if present
+  // Get output array for extraction
   const output = data?.output || [];
-  const toolCalls = output.filter(item => item?.type === "function_call");
-  
-  if (toolCalls.length > 0) {
-    console.log("[OpenAI] Tool calls detected:", toolCalls.length);
-  }
-  
-  if (allowToolCalling && toolCalls.length > 0) {
-    events?.onToolStart?.();
-    
-    try {
-      const toolResults = [];
-      for (const tc of toolCalls) {
-        // For function_call type, the properties are directly on the object
-        const name = tc?.name;
-        let args = {};
-        try {
-          args = JSON.parse(tc?.arguments || "{}");
-        } catch {}
-        
-        console.log("[OpenAI] Executing tool:", name, "with args:", args);
-        const result = await executeBuiltinTool(name, args);
-        
-        toolResults.push({
-          type: "function_result",
-          call_id: tc.call_id,
-          result: JSON.stringify(result),
-        });
-      }
-
-      // Follow-up call with tool results - append to output
-      const followBody = {
-        model,
-        instructions: system,
-        input: prompt,  // Keep as plain string
-        max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
-        output: [...output, ...toolResults],  // Append tool results to output
-        tools: OPENAI_TOOLS,  // Keep tools available
-        tool_choice: "none"  // Don't call more tools
-      };
-
-      console.log("[OpenAI] Making follow-up call with tool results");
-      const followRes = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "OpenAI-Beta": "responses-api-v1"
-        },
-        body: JSON.stringify(followBody),
-      });
-      console.log("[OpenAI] Follow-up response status:", followRes.status);
-
-      if (!followRes.ok) {
-        const text = await followRes.text().catch(() => "");
-        throw new Error(`OpenAI follow-up error ${followRes.status}: ${text}`);
-      }
-
-      const followData = await followRes.json();
-      console.log("[OpenAI] Follow-up response:", JSON.stringify(followData).substring(0, 500));
-      
-      // Check for direct text field first
-      if (followData?.text && typeof followData.text === 'string') {
-        console.log("[OpenAI] Found text in follow-up data.text field");
-        return followData.text.trim();
-      }
-      
-      return extractTextFromResponsesOutput(followData?.output || []);
-    } finally {
-      events?.onToolEnd?.();
-    }
-  }
 
   // Try extracting from output first, then fallback to full data
   let result = extractTextFromResponsesOutput(output);
