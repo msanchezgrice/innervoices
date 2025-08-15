@@ -26,7 +26,9 @@ export default function ResponseHistory({ onClose = () => {}, noteId = null }) {
   
   console.log("[ResponseHistory] Rendering for noteId:", noteId);
   console.log("[ResponseHistory] All history keys:", Object.keys(allHistory || {}));
+  console.log("[ResponseHistory] History for this note:", allHistory?.[noteId]?.length || 0, "items");
   console.log("[ResponseHistory] Current note history length:", responseHistory.length);
+  console.log("[ResponseHistory] First response noteId:", responseHistory[0]?.noteId);
 
   // Auto-scroll to top when new responses are added
   useEffect(() => {

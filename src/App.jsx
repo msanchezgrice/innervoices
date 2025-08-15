@@ -89,6 +89,8 @@ function App() {
         contentLength: activeNote?.content?.length || 0,
         orbState: useConfigStore.getState().orbState,
         isActive: useConfigStore.getState().isActive,
+        currentId: currentId,
+        activeNoteId: activeNote?.id,
         timestamp: new Date().toISOString()
       });
       
@@ -161,26 +163,36 @@ function App() {
       }
     },
     onResponse: (r) => {
+      // Get the current noteId from useWatcher's context
+      const watcherNoteId = currentId;
       console.log("[App] onResponse called with:", {
         responseLength: r?.length || 0,
         responsePreview: r?.substring(0, 50),
-        currentNoteId: currentId,
-        hasCurrentId: !!currentId
+        watcherNoteId: watcherNoteId,
+        currentId: currentId,
+        activeNoteId: activeNote?.id,
+        hasCurrentId: !!currentId,
+        timestamp: new Date().toISOString()
       });
       
       setTrace((t) => ({ ...t, response: r || "" }));
       
-      if (r && r.trim() && currentId) {
+      if (r && r.trim() && watcherNoteId) {
         const currentTrace = useConfigStore.getState().trace;
-        console.log("[App] Adding response to history for note:", currentId, "model:", currentTrace.model);
-        addResponseToHistory(r, currentTrace.model || "Unknown", currentId);
+        console.log("[App] Adding response to history for note:", watcherNoteId, "model:", currentTrace.model);
+        addResponseToHistory(r, currentTrace.model || "Unknown", watcherNoteId);
+        
+        // Verify it was added
+        const updatedHistory = useConfigStore.getState().responseHistory;
+        console.log("[App] After adding, history keys:", Object.keys(updatedHistory));
+        console.log("[App] Note", watcherNoteId, "now has", updatedHistory[watcherNoteId]?.length || 0, "responses");
       } else {
         console.log("[App] Not adding response to history - missing data:", {
           hasResponse: !!r,
           responseIsEmpty: !r || !r.trim(),
           responseLength: r?.length,
-          hasNoteId: !!currentId,
-          noteId: currentId
+          hasNoteId: !!watcherNoteId,
+          noteId: watcherNoteId
         });
       }
     },
@@ -230,6 +242,17 @@ function App() {
     enabled: isActive && currentRoute.type === 'app' && !showOnboarding,
     noteId: currentId,
   });
+  
+  // Debug logging for note tracking
+  useEffect(() => {
+    console.log("[App] Note context changed:", {
+      currentId,
+      activeNoteId: activeNote?.id,
+      activeNoteTitle: activeNote?.title,
+      notesCount: notes.length,
+      timestamp: new Date().toISOString()
+    });
+  }, [currentId, activeNote?.id]);
 
   useEffect(() => {
     const onKey = (e) => {

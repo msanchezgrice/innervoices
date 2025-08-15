@@ -37,6 +37,7 @@ export function useWatcher(
   const lastSnapshotRef = useRef("");
   const runningRef = useRef(false);
   const enabledRef = useRef(Boolean(enabled));
+  const noteIdRef = useRef(noteId);
 
   // track latest text
   useEffect(() => {
@@ -48,6 +49,12 @@ export function useWatcher(
   useEffect(() => {
     enabledRef.current = Boolean(enabled);
   }, [enabled]);
+  
+  // track noteId
+  useEffect(() => {
+    noteIdRef.current = noteId;
+    console.log("[Watcher] noteId updated to:", noteId);
+  }, [noteId]);
 
   useEffect(() => {
     const WATCH_INTERVAL = Number(config?.watchInterval ?? 5000);
@@ -78,9 +85,16 @@ export function useWatcher(
         onThinking && onThinking();
 
         // Get response history from store for memory (note-specific)
+        const currentNoteId = noteIdRef.current;
         const getResponseHistoryForNote = useConfigStore.getState().getResponseHistoryForNote;
-        const responseHistory = noteId ? getResponseHistoryForNote(noteId) : [];
-        console.log("[Watcher] Using noteId:", noteId, "with", responseHistory.length, "previous responses");
+        const responseHistory = currentNoteId ? getResponseHistoryForNote(currentNoteId) : [];
+        console.log("[Watcher] Analysis starting:", {
+          noteId: currentNoteId,
+          hasNoteId: !!currentNoteId,
+          responseHistoryLength: responseHistory.length,
+          textLength: currentText.length,
+          timestamp: new Date().toISOString()
+        });
         
         // Call AI
         const commentary = await analyzeText(currentText, config, {
@@ -128,5 +142,6 @@ export function useWatcher(
     config?.creativity,
     config?.maxCommentLength,
     enabled,
+    noteId,
   ]);
 }
