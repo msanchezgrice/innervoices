@@ -15,7 +15,7 @@
 
 export async function speakWithElevenLabs(
   text,
-  { apiKey, voiceId, modelId = "eleven_multilingual_v2", stability = 0.5, similarity_boost = 0.75 } = {},
+  { apiKey, voiceId, modelId = "eleven_flash_v2_5", stability = 0.5, similarity_boost = 0.75 } = {},
   { onStart, onEnd } = {}
 ) {
   if (!text || !apiKey || !voiceId) {
