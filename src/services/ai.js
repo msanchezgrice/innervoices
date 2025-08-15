@@ -102,12 +102,14 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
   }
   const system = getSystemPrompt(config);
 
-  // Use Responses API
+  // Use Responses API with future-proof format
   const body = {
     model,
     instructions: system,
-    input: prompt,
-    max_output_tokens: Number(config?.maxTokens ?? 10000),
+    // Use array format for future multi-modal support
+    input: [{ type: "text", text: prompt }],
+    // Ensure max_output_tokens is reasonable for all models
+    max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
     ...(allowToolCalling ? { 
       tools: OPENAI_TOOLS,
       tool_choice: "auto"  // Allow model to decide when to use tools
@@ -158,7 +160,8 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
           type: "function",
           function: {
             name,
-            result: JSON.stringify(result),
+            // Pass result as raw object/value for better model parsing
+            result: result.ok ? result.result : result.error,
           },
           id: tc.id,
         });
@@ -168,8 +171,8 @@ async function callOpenAIResponses(prompt, config, { allowToolCalling = false } 
       const followBody = {
         model,
         instructions: system,
-        input: prompt,
-        max_output_tokens: Number(config?.maxTokens ?? 10000),
+        input: [{ type: "text", text: prompt }],
+        max_output_tokens: Math.min(Number(config?.maxTokens ?? 4096), 16384),
         context: {
           previous_output: output,
           tool_results: toolResults,
@@ -208,17 +211,22 @@ function extractTextFromResponsesOutput(output) {
   if (!Array.isArray(output)) return "";
   
   for (const item of output) {
-    // Check for direct text output
+    // Check for direct text output (most common in Responses API)
     if (item?.type === "text" && typeof item?.text === "string") {
       return item.text.trim();
     }
     
-    // Check for message with content array
+    // Check for message with content array (conversational format)
     if (item?.type === "message" && Array.isArray(item?.content)) {
       const textPart = item.content.find(c => c?.type === "text" && typeof c?.text === "string");
       if (textPart?.text) {
         return textPart.text.trim();
       }
+    }
+    
+    // Handle string output directly (some models may return this)
+    if (typeof item === "string") {
+      return item.trim();
     }
   }
   
