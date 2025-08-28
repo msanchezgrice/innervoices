@@ -1,33 +1,57 @@
 import { useEffect, useRef } from "react";
-import { pickBestVoice } from "./useVoices.js";
 import { speakWithElevenLabs } from "../services/tts/elevenlabs.js";
 import { listElevenLabsVoices } from "../services/tts/elevenlabsApi.js";
 import { useConfigStore } from "../store/useConfigStore.js";
+import { useRealtime } from "./useRealtime.js";
 
 /**
- * Browser SpeechSynthesis wrapper.
+ * Unified Voice output hook.
+ * - Default: OpenAI Realtime audio (WebRTC remote audio track)
+ * - Fallback: ElevenLabs REST TTS
+ *
  * Usage:
  * const { speak, cancel, isSpeaking } = useVoice(config, { onStart, onEnd });
  */
 export function useVoice(config, { onStart, onEnd } = {}) {
   const speakingRef = useRef(false);
-  const controllerRef = useRef(null);
+  const ttsControllerRef = useRef(null); // used by ElevenLabs
+
+  // Realtime client for audio output
+  const realtime = useRealtime(config, {
+    onAudioStart: () => {
+      speakingRef.current = true;
+      try {
+        onStart && onStart();
+      } catch {}
+    },
+    onAudioEnd: () => {
+      speakingRef.current = false;
+      try {
+        onEnd && onEnd();
+      } catch {}
+    },
+    onError: (e) => {
+      // No-op here; caller may have error handlers higher up
+      // console.error("[useVoice] Realtime error:", e);
+    },
+  });
 
   useEffect(() => {
     return () => {
       try {
-        controllerRef.current?.cancel?.();
+        ttsControllerRef.current?.cancel?.();
       } catch {}
       try {
-        window.speechSynthesis?.cancel();
+        realtime?.disconnect?.();
       } catch {}
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const speak = async (text) => {
     if (!text || !config?.voiceEnabled) return;
 
-    // Prefer ElevenLabs if configured
+    // Prefer ElevenLabs if explicitly selected
     if (config?.ttsProvider === "elevenlabs" && config?.elevenlabsApiKey) {
       try {
         // Resolve ElevenLabs voice ID if missing but a preferred voice name is provided
@@ -36,24 +60,28 @@ export function useVoice(config, { onStart, onEnd } = {}) {
           try {
             const voices = await listElevenLabsVoices(config.elevenlabsApiKey);
             const match = voices.find(
-              (v) => (v?.name || "").toLowerCase() === String(config.elevenlabsVoiceName || "").toLowerCase()
+              (v) =>
+                (v?.name || "").toLowerCase() ===
+                String(config.elevenlabsVoiceName || "").toLowerCase()
             );
             if (match?.voice_id) {
               resolvedVoiceId = match.voice_id;
               try {
                 // Persist for subsequent calls
-                useConfigStore.getState().updateConfig({ elevenlabsVoiceId: resolvedVoiceId });
+                useConfigStore
+                  .getState()
+                  .updateConfig({ elevenlabsVoiceId: resolvedVoiceId });
               } catch {}
             }
           } catch {
-            // ignore resolution errors; will fall back to browser TTS if still missing
+            // ignore resolution errors; will continue without voice id
           }
         }
 
         if (resolvedVoiceId) {
           // Cancel any existing playback first
           try {
-            controllerRef.current?.cancel?.();
+            ttsControllerRef.current?.cancel?.();
           } catch {}
 
           const controller = await speakWithElevenLabs(
@@ -73,63 +101,42 @@ export function useVoice(config, { onStart, onEnd } = {}) {
               },
             }
           );
-          controllerRef.current = controller;
+          ttsControllerRef.current = controller;
           return;
         }
       } catch {
-        // Fall back to browser TTS
+        // Fall through to realtime if ElevenLabs fails
       }
     }
 
-    // Browser TTS fallback
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-
+    // Default: OpenAI Realtime audio
     try {
-      synth.cancel(); // stop any ongoing utterances
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = Number(config.voiceSpeed ?? 1);
-      utter.pitch = Number(config.voicePitch ?? 1);
-      utter.volume = Number(config.voiceVolume ?? 0.3);
-
-      // Choose a higher-quality voice when available (Google/Microsoft/Siri), or user-selected voice
+      // Cancel any previous EL controller
       try {
-        const voices = synth.getVoices?.() || [];
-        const chosen = pickBestVoice(voices, config?.voiceName || "", "en-US");
-        if (chosen) {
-          utter.voice = chosen;
-          if (chosen.lang) utter.lang = chosen.lang;
-        }
+        ttsControllerRef.current?.cancel?.();
       } catch {}
 
-      utter.onstart = () => {
-        speakingRef.current = true;
-        onStart && onStart();
-      };
-      utter.onend = () => {
-        speakingRef.current = false;
-        onEnd && onEnd();
-      };
-      utter.onerror = () => {
-        speakingRef.current = false;
-        onEnd && onEnd();
-      };
+      // Ensure connection (no mic needed for output)
+      await realtime.connect({ micEnabled: false });
 
-      synth.speak(utter);
+      // Send text with audio+text modalities (audio will play via remote track)
+      realtime.sendText(text, { modalities: ["audio", "text"] });
     } catch {
-      // no-op fallback
+      // Swallow errors here; higher-level error handling may exist
     }
   };
 
   const cancel = () => {
     try {
-      controllerRef.current?.cancel?.();
+      ttsControllerRef.current?.cancel?.();
     } catch {}
     try {
-      window.speechSynthesis?.cancel();
+      realtime.cancel();
     } catch {}
     speakingRef.current = false;
-    onEnd && onEnd();
+    try {
+      onEnd && onEnd();
+    } catch {}
   };
 
   return {

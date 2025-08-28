@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import { analyzeText } from "../services/ai";
 import { useConfigStore } from "../store/useConfigStore";
+import { useRealtime } from "./useRealtime.js";
+import { buildPrompt } from "../config/prompts.js";
+import { detectContext } from "../utils/detectContext.js";
 
 /**
  * Watches the user's text and triggers AI commentary periodically.
@@ -27,6 +30,8 @@ export function useWatcher(
     onResponse,
     onSystemPrompt,
     onMeta,
+    onAudioStart,
+    onAudioEnd,
     enabled = true,
     noteId = null,
   } = {}
@@ -38,6 +43,48 @@ export function useWatcher(
   const runningRef = useRef(false);
   const enabledRef = useRef(Boolean(enabled));
   const noteIdRef = useRef(noteId);
+  const pendingResolveRef = useRef(null);
+
+  // Realtime session (used when aiProvider === "openai-realtime")
+  const realtime = useRealtime(config, {
+    onTextDone: (finalText) => {
+      // Bubble text to caller and trigger comment
+      try {
+        if (typeof onResponse === "function") onResponse(finalText);
+      } catch {}
+      try {
+        if (typeof onComment === "function" && finalText) onComment(finalText);
+      } catch {}
+      lastCommentAtRef.current = Date.now();
+
+      // Resolve any pending waiters
+      const fn = pendingResolveRef.current;
+      pendingResolveRef.current = null;
+      if (typeof fn === "function") {
+        try { fn(); } catch {}
+      }
+    },
+    onAudioStart: () => {
+      try {
+        if (typeof onAudioStart === "function") onAudioStart();
+      } catch {}
+    },
+    onAudioEnd: () => {
+      try {
+        if (typeof onAudioEnd === "function") onAudioEnd();
+      } catch {}
+    },
+    onError: (e) => {
+      try {
+        if (typeof onError === "function") onError(e);
+      } catch {}
+      const fn = pendingResolveRef.current;
+      pendingResolveRef.current = null;
+      if (typeof fn === "function") {
+        try { fn(); } catch {}
+      }
+    },
+  });
 
   // track latest text
   useEffect(() => {
@@ -62,6 +109,7 @@ export function useWatcher(
     const COMMENT_PROB = Number(config?.commentProbability ?? 0.3);
 
     const handleTick = async () => {
+      const provider = String(config?.aiProvider || "").toLowerCase();
       if (!enabledRef.current) return;
       if (runningRef.current) return;
 
@@ -93,32 +141,76 @@ export function useWatcher(
           hasNoteId: !!currentNoteId,
           responseHistoryLength: responseHistory.length,
           textLength: currentText.length,
+          provider,
           timestamp: new Date().toISOString()
         });
-        
-        // Call AI
-        const commentary = await analyzeText(currentText, config, {
-          onToolStart: () => onToolStart && onToolStart(),
-          onToolEnd: () => onToolEnd && onToolEnd(),
-          onPrompt: (p) => onPrompt && onPrompt(p),
-          onApiStart: (meta) => onApiStart && onApiStart(meta),
-          onApiEnd: (meta) => onApiEnd && onApiEnd(meta),
-          onResponse: (r) => onResponse && onResponse(r),
-          onSystemPrompt: (s) => onSystemPrompt && onSystemPrompt(s),
-          onMeta: (m) => onMeta && onMeta(m),
-        }, responseHistory);
-        
-        // ALWAYS update snapshot to prevent infinite loop
-        lastSnapshotRef.current = currentText;
-        
-        if (commentary && typeof onComment === "function") {
-          console.log("[Watcher] Commentary generated:", commentary?.substring(0, 100) + "...");
-          onComment(commentary);
-          lastCommentAtRef.current = Date.now();
+
+        if (provider === "openai-realtime") {
+          // Build prompt with context + history
+          const ctx = detectContext(currentText);
+          const composed = buildPrompt(currentText, config, ctx, responseHistory);
+
+          onPrompt && onPrompt(composed);
+
+          const t0 = Date.now();
+          onApiStart && onApiStart({
+            provider: "openai-realtime",
+            model: realtime?.model || (config?.openaiRealtimeModel || "gpt-4o-realtime-preview"),
+            promptLength: composed.length
+          });
+
+          try {
+            // Ensure connection
+            await realtime.connect({ micEnabled: false });
+          } catch (e) {
+            // If realtime connect fails, surface error and bail this tick
+            onApiEnd && onApiEnd({ provider: "openai-realtime", model: realtime?.model, ms: 0, ok: false, error: e?.message || String(e) });
+            throw e;
+          }
+
+          // Wait for completion via onTextDone handler
+          await new Promise((resolve) => {
+            pendingResolveRef.current = resolve;
+            try {
+              realtime.sendText(composed, { modalities: ["text", "audio"] });
+            } catch (e) {
+              // immediate send failure - resolve and rethrow
+              pendingResolveRef.current = null;
+              resolve();
+              throw e;
+            }
+          });
+
+          const ms = Date.now() - t0;
+          onApiEnd && onApiEnd({ provider: "openai-realtime", model: realtime?.model, ms, ok: true });
+
+          // ALWAYS update snapshot to prevent infinite loop
+          lastSnapshotRef.current = currentText;
         } else {
-          console.log("[Watcher] No commentary generated or no onComment handler");
-          // Still update last comment time to prevent rapid retries
-          lastCommentAtRef.current = Date.now();
+          // Legacy path: Responses/Anthropic
+          const commentary = await analyzeText(currentText, config, {
+            onToolStart: () => onToolStart && onToolStart(),
+            onToolEnd: () => onToolEnd && onToolEnd(),
+            onPrompt: (p) => onPrompt && onPrompt(p),
+            onApiStart: (meta) => onApiStart && onApiStart(meta),
+            onApiEnd: (meta) => onApiEnd && onApiEnd(meta),
+            onResponse: (r) => onResponse && onResponse(r),
+            onSystemPrompt: (s) => onSystemPrompt && onSystemPrompt(s),
+            onMeta: (m) => onMeta && onMeta(m),
+          }, responseHistory);
+          
+          // ALWAYS update snapshot to prevent infinite loop
+          lastSnapshotRef.current = currentText;
+          
+          if (commentary && typeof onComment === "function") {
+            console.log("[Watcher] Commentary generated:", commentary?.substring(0, 100) + "...");
+            onComment(commentary);
+            lastCommentAtRef.current = Date.now();
+          } else {
+            console.log("[Watcher] No commentary generated or no onComment handler");
+            // Still update last comment time to prevent rapid retries
+            lastCommentAtRef.current = Date.now();
+          }
         }
       } catch (e) {
         console.error("[Watcher] Analysis error:", {

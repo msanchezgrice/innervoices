@@ -90,6 +90,20 @@ export default function ResponseHistory({ onClose = () => {}, noteId = null }) {
               <div className="text-sm text-neutral-700 dark:text-neutral-200 whitespace-pre-wrap break-words leading-relaxed">
                 {item.response || "No response"}
               </div>
+              {item.image_base64 && (
+                <div className="mt-2">
+                  <img
+                    src={item.image_base64}
+                    alt={item.image_prompt || "Generated image"}
+                    className="rounded border border-neutral-200 dark:border-neutral-700 max-w-full"
+                  />
+                  {item.image_prompt && (
+                    <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
+                      Prompt: {item.image_prompt}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Metadata */}
               <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 mt-2 border-t border-neutral-200 dark:border-neutral-700 pt-2">

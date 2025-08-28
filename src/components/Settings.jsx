@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useConfigStore } from "../store/useConfigStore";
-import { useVoices } from "../hooks/useVoices";
 import { useVoice } from "../hooks/useVoice";
 import { listElevenLabsVoices } from "../services/tts/elevenlabsApi";
 
@@ -38,7 +37,6 @@ const ANTHROPIC_MODELS = [
 export default function Settings() {
   const config = useConfigStore((s) => s.config);
   const updateConfig = useConfigStore((s) => s.updateConfig);
-  const browserVoices = useVoices();
   const { speak } = useVoice(config);
 
   const [elVoices, setElVoices] = useState([]);
@@ -426,7 +424,7 @@ export default function Settings() {
           value={config.ttsProvider}
           onChange={(e) => updateConfig({ ttsProvider: e.target.value })}
         >
-          <option value="browser">Browser (SpeechSynthesis)</option>
+          <option value="openai-realtime">OpenAI Realtime (Text+Audio)</option>
           <option value="elevenlabs">ElevenLabs</option>
         </select>
       </div>
@@ -507,21 +505,28 @@ export default function Settings() {
             </div>
           </>
         ) : (
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">Voice</label>
-            <select
-              className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-              value={config.voiceName || ""}
-              onChange={(e) => updateConfig({ voiceName: e.target.value })}
-            >
-              <option value="">Auto (best available)</option>
-              {browserVoices.map((v) => (
-                <option key={`${v.name}-${v.lang}`} value={v.name}>
-                  {v.name} {v.lang ? `(${v.lang})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">OpenAI Realtime Voice</label>
+              <input
+                type="text"
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                value={config.openaiRealtimeVoice || ""}
+                onChange={(e) => updateConfig({ openaiRealtimeVoice: e.target.value })}
+                placeholder="e.g., alloy"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">OpenAI Realtime Model</label>
+              <input
+                type="text"
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                value={config.openaiRealtimeModel || ""}
+                onChange={(e) => updateConfig({ openaiRealtimeModel: e.target.value })}
+                placeholder="e.g., gpt-4o-realtime-preview"
+              />
+            </div>
+          </>
         )}
 
         <button

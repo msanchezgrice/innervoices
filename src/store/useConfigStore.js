@@ -110,7 +110,7 @@ export const useConfigStore = create((set, get) => ({
     }),
 
   // Response History (per note)
-  addResponseToHistory: (response, model, noteId) => 
+  addResponseToHistory: (response, model, noteId, extras = {}) => 
     set((state) => {
       console.log("[Store] addResponseToHistory called with noteId:", noteId);
       
@@ -125,6 +125,7 @@ export const useConfigStore = create((set, get) => ({
         model,
         noteId, // Include the noteId in the entry
         timestamp: Date.now(),
+        ...extras,
       };
       
       const currentNoteHistory = state.responseHistory[noteId] || [];

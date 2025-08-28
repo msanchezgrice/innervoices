@@ -33,12 +33,12 @@ Live preview is intended to be deployed to Vercel (static hosting). Users bring 
   - Personality, tone, frequency, probability, creativity, comment length.
   - OpenAI-only model selection.
   - Voice settings:
-    - Browser SpeechSynthesis or ElevenLabs (preferred by default).
+    - OpenAI Realtime (default) or ElevenLabs (backup).
     - For ElevenLabs, voice can be selected; app also auto-resolves a preferred voice by name if a voice ID isn’t set.
   - Debug logging option (console).
 - Ambient AI commentary
   - Background watcher periodically evaluates note content.
-  - Emits commentary via TTS (ElevenLabs or browser fallback).
+  - Emits commentary via OpenAI Realtime audio (default) or ElevenLabs fallback.
   - Tooling hooks exist for future tool-calls (context detection is available).
 - Stability and UX
   - Hooks are stable (no early-return altering hook order).
@@ -54,9 +54,9 @@ Live preview is intended to be deployed to Vercel (static hosting). Users bring 
 - Zustand (state)
   - `useConfigStore`: app configuration and trace
   - `useNotesStore`: note CRUD and selection
-- OpenAI (Chat Completions) for text generation
-- ElevenLabs for higher‑quality TTS (optional)
-- Browser SpeechSynthesis as fallback TTS
+- OpenAI Realtime (WebRTC) for text+audio; OpenAI Responses API as fallback for text
+- ElevenLabs TTS (backup/optional)
+- No browser SpeechSynthesis fallback; removed
 
 ---
 
@@ -83,10 +83,12 @@ innervoices/
     │   └── Settings.jsx      # Settings; OpenAI-only
     ├── hooks/
     │   ├── useWatcher.js     # Schedules analysis, manages thinking/tooling states
-    │   ├── useVoice.js       # TTS (prefers ElevenLabs, fallback to browser)
-    │   └── useVoices.js      # Browser SpeechSynthesis voice utilities
+    │   ├── useVoice.js       # Voice output via OpenAI Realtime (default) or ElevenLabs
+    │   └── useRealtime.js    # Realtime session hook (WebRTC)
     ├── services/
-    │   ├── ai.js             # OpenAI/Anthropic clients (OpenAI Chat Completions used)
+    │   ├── ai.js             # OpenAI/Anthropic clients (Responses fallback)
+    │   ├── realtime/
+    │   │   └── client.js       # WebRTC Realtime client (browser)
     │   └── tts/
     │       ├── elevenlabs.js     # ElevenLabs speak (non-streaming)
     │       └── elevenlabsApi.js  # ElevenLabs voices listing
@@ -109,8 +111,10 @@ Because this is a client-only app, keys that you expose via Vite (VITE_*) are em
 ### Preferred environment variable inputs (Vercel)
 
 - OpenAI
-  - `OPENAI_API_KEY` or `VITE_OPENAI_API_KEY`
+  - `OPENAI_API_KEY` (server; required for Realtime and Images)
+  - Optional client: `VITE_OPENAI_API_KEY` (for non-realtime testing)
   - Optional: `VITE_OPENAI_MODEL` (defaults to `gpt-5-mini`)
+  - Optional Realtime: `VITE_OPENAI_REALTIME_MODEL` and `VITE_OPENAI_REALTIME_VOICE`
 - ElevenLabs
   - `ELEVEN_LABS_API_KEY` or `VITE_ELEVENLABS_API_KEY`
 
@@ -124,10 +128,10 @@ vite.config.js maps non‑VITE variables to VITE at build time:
 - Provider: OpenAI (UI is OpenAI‑only; Anthropic disabled due to browser CORS)
 - Model: `gpt-5-mini` by default
 - Max tokens: 25,000 (fallback defaults across services)
-- TTS provider: ElevenLabs by default
+- TTS provider: OpenAI Realtime by default (ElevenLabs optional backup)
   - Preferred voice name: “Michael C Vincent”
   - On first TTS call, if a voice ID isn’t configured, the app lists your ElevenLabs voices and persists the ID of the matching name (case-insensitive).
-- Browser SpeechSynthesis: used as fallback if ElevenLabs fails or is disabled
+- No browser SpeechSynthesis fallback
 
 ---
 
@@ -176,19 +180,19 @@ Security note: Client‑side embedding of secrets is fine for private testing; a
 ## How It Works (High-Level)
 
 - `useWatcher` (background analysis loop)
-  - On interval, pulls the current note content and config, builds a prompt (`prompts.js`), and calls the AI client (`services/ai.js`).
+  - On interval, builds a prompt (`prompts.js`) and either sends via OpenAI Realtime (WebRTC) or falls back to the Responses client (`services/ai.js`).
   - Emits trace events to `useConfigStore` (thinking/tooling states; provider/model; prompt/response; errors).
-  - TTS commentary is sent to `useVoice` which prefers ElevenLabs then falls back to SpeechSynthesis.
+  - Voice output uses OpenAI Realtime by default; ElevenLabs is available as backup.
 
 - `services/ai.js` (AI clients)
-  - OpenAI: Chat Completions (prefers modern params; temperature omitted for GPt‑5/4.1 families if required).
+  - OpenAI: Realtime (WebRTC) for text+audio; Responses API as a non-realtime fallback.
   - Anthropic: Implemented, but disabled in Settings due to CORS in browser; use a backend proxy to enable.
 
 - `useVoice`
   - If `ttsProvider === "elevenlabs"` and API key is set:
     - Ensures a voiceId is known; if not, resolves it by name and persists.
     - Calls ElevenLabs TTS (non‑streaming) and plays audio in the browser.
-  - Else: uses SpeechSynthesis with best available voice.
+  - Else: uses OpenAI Realtime audio (WebRTC remote track).
 
 ---
 
@@ -204,7 +208,7 @@ Security note: Client‑side embedding of secrets is fine for private testing; a
   - `commentInterval` minimum spacing between comments.
   - `commentProbability` the likelihood to produce a comment on a check.
 - Voice
-  - Provider: Browser or ElevenLabs.
+  - Provider: OpenAI Realtime or ElevenLabs.
   - Voice speed, pitch, volume.
   - Test voice button.
 

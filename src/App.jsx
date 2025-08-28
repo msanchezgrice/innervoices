@@ -162,7 +162,7 @@ function App() {
         }, 2000);
       }
     },
-    onResponse: (r) => {
+    onResponse: async (r) => {
       // Get the current noteId from useWatcher's context
       const watcherNoteId = currentId;
       console.log("[App] onResponse called with:", {
@@ -186,6 +186,35 @@ function App() {
         const updatedHistory = useConfigStore.getState().responseHistory;
         console.log("[App] After adding, history keys:", Object.keys(updatedHistory));
         console.log("[App] Note", watcherNoteId, "now has", updatedHistory[watcherNoteId]?.length || 0, "responses");
+
+        // Detect "IMAGE: <prompt>" in the response and generate an image
+        const imageMatch = (r || "").match(/(?:^|\n)IMAGE:\s*(.+)/i);
+        if (imageMatch && imageMatch[1]) {
+          const imagePrompt = imageMatch[1].trim();
+          try {
+            const resp = await fetch("/api/generate-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt: imagePrompt })
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data?.image_base64) {
+                useConfigStore.getState().addResponseToHistory(
+                  "",
+                  currentTrace.model || "Unknown",
+                  watcherNoteId,
+                  { image_base64: data.image_base64, image_prompt: imagePrompt }
+                );
+              }
+            } else {
+              const txt = await resp.text();
+              console.error("[App] Image generation failed:", resp.status, txt);
+            }
+          } catch (e) {
+            console.error("[App] Image generation error:", e);
+          }
+        }
       } else {
         console.log("[App] Not adding response to history - missing data:", {
           hasResponse: !!r,
@@ -202,6 +231,16 @@ function App() {
     onMeta: (m) => {
       setTrace((t) => ({ ...t, meta: { ...(t?.meta || {}), ...(m || {}) } }));
     },
+    onAudioStart: () => {
+      if (useConfigStore.getState().orbState !== "muted") {
+        setOrbState("speaking");
+      }
+    },
+    onAudioEnd: () => {
+      if (useConfigStore.getState().orbState !== "muted") {
+        setOrbState("idle");
+      }
+    },
     onComment: (commentary) => {
       console.log("[App] Comment received", {
         commentLength: commentary?.length || 0,
@@ -216,8 +255,8 @@ function App() {
       }
       
       setOrbState("ready");
-      if (config.voiceEnabled) {
-        console.log("[App] Speaking comment via TTS");
+      if (config.voiceEnabled && config.ttsProvider === "elevenlabs") {
+        console.log("[App] Speaking comment via ElevenLabs TTS");
         speak(commentary);
       }
     },
