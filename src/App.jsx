@@ -78,9 +78,13 @@ function App() {
   const clearTrace = useConfigStore((s) => s.clearTrace);
   const addResponseToHistory = useConfigStore((s) => s.addResponseToHistory);
 
-  const { speak, cancel } = useVoice(config, {
+  const { speak, cancel, pause, resume, enableAudio, isPaused } = useVoice(config, {
     onStart: () => setOrbState("speaking"),
     onEnd: () => setOrbState("idle"),
+    onAutoplayBlocked: () => {
+      console.warn("[App] Autoplay blocked; click to enable audio");
+      setOrbState("ready");
+    }
   });
 
   useWatcher(activeNote?.content || "", config, {
@@ -206,6 +210,8 @@ function App() {
                   watcherNoteId,
                   { image_base64: data.image_base64, image_prompt: imagePrompt }
                 );
+                // Open the Response History panel to show the generated image
+                setShowResponseHistory(true);
               }
             } else {
               const txt = await resp.text();
@@ -240,6 +246,10 @@ function App() {
       if (useConfigStore.getState().orbState !== "muted") {
         setOrbState("idle");
       }
+    },
+    onImage: () => {
+      // Auto-open Response History panel when an image is generated
+      setShowResponseHistory(true);
     },
     onComment: (commentary) => {
       console.log("[App] Comment received", {
@@ -307,15 +317,32 @@ function App() {
   }, []);
 
   const handleOrbClick = (e) => {
-    // If speaking, stop immediately, then toggle action
-    if (orbState === "speaking") cancel();
+    // Alt+Click toggles mute
     if (e && e.altKey) {
-      // Alt+Click toggles mute
       toggleMute();
-    } else {
-      // Click toggles Start/Pause (watcher active)
-      toggleActive();
+      return;
     }
+
+    // If currently speaking, toggle pause/resume without cancelling the stream
+    if (orbState === "speaking") {
+      try {
+        if (isPaused && isPaused()) {
+          resume && resume();
+          setOrbState("speaking");
+        } else {
+          pause && pause();
+          // Use "ready" to indicate paused but content available
+          setOrbState("ready");
+        }
+      } catch {}
+      return;
+    }
+
+    // Try to enable audio on user gesture (fixes autoplay policies)
+    try { enableAudio && enableAudio(); } catch {}
+
+    // Click toggles Start/Pause (watcher active)
+    toggleActive();
   };
 
   return (

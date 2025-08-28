@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   const VITE_OPENAI_API_KEY =
-    env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY || "";
+    env.VITE_OPENAI_API_KEY || "";
   const VITE_ELEVENLABS_API_KEY =
     env.VITE_ELEVENLABS_API_KEY || env.ELEVEN_LABS_API_KEY || "";
   const VITE_OPENAI_MODEL = env.VITE_OPENAI_MODEL || "gpt-5-mini";

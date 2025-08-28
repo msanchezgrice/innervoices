@@ -21,6 +21,7 @@ export function useRealtime(config, handlers = {}) {
     onStateChange,
     onToolCall,
     onImage,
+    onAutoplayBlocked,
   } = handlers;
 
   const [connected, setConnected] = useState(false);
@@ -64,6 +65,9 @@ export function useRealtime(config, handlers = {}) {
         setConnected(!!s?.connected);
         setSpeaking(!!s?.speaking);
         try { onStateChange && onStateChange(s); } catch {}
+      },
+      onAutoplayBlocked: () => {
+        try { onAutoplayBlocked && onAutoplayBlocked(); } catch {}
       },
       onToolCall: async (name, args, callId) => {
         try {
@@ -160,6 +164,31 @@ export function useRealtime(config, handlers = {}) {
     client.cancel();
   }, []);
 
+  const pause = useCallback(() => {
+    const client = clientRef.current;
+    if (!client) return;
+    if (typeof client.pause === "function") client.pause();
+  }, []);
+
+  const resume = useCallback(() => {
+    const client = clientRef.current;
+    if (!client) return;
+    if (typeof client.resume === "function") client.resume();
+  }, []);
+
+  const enableAudio = useCallback(() => {
+    const client = clientRef.current;
+    if (!client) return;
+    if (typeof client.enableAudio === "function") client.enableAudio();
+  }, []);
+
+  const isPaused = useCallback(() => {
+    const client = clientRef.current;
+    if (!client) return false;
+    if (typeof client.isPaused === "function") return client.isPaused();
+    return false;
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -175,6 +204,10 @@ export function useRealtime(config, handlers = {}) {
     disconnect,
     sendText,
     cancel,
+    pause,
+    resume,
+    enableAudio,
+    isPaused,
     connected,
     speaking,
     model,

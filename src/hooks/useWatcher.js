@@ -32,6 +32,7 @@ export function useWatcher(
     onMeta,
     onAudioStart,
     onAudioEnd,
+    onImage,
     enabled = true,
     noteId = null,
   } = {}
@@ -76,6 +77,8 @@ export function useWatcher(
             currentNoteId,
             { image_base64, image_prompt: prompt }
           );
+          // Bubble up to caller (e.g., App) so it can open the history panel
+          try { typeof onImage === "function" && onImage({ image_base64, prompt }); } catch {}
         }
       } catch {}
     },

@@ -12,7 +12,7 @@ import { useRealtime } from "./useRealtime.js";
  * Usage:
  * const { speak, cancel, isSpeaking } = useVoice(config, { onStart, onEnd });
  */
-export function useVoice(config, { onStart, onEnd } = {}) {
+export function useVoice(config, { onStart, onEnd, onAutoplayBlocked } = {}) {
   const speakingRef = useRef(false);
   const ttsControllerRef = useRef(null); // used by ElevenLabs
 
@@ -33,6 +33,9 @@ export function useVoice(config, { onStart, onEnd } = {}) {
     onError: (e) => {
       // No-op here; caller may have error handlers higher up
       // console.error("[useVoice] Realtime error:", e);
+    },
+    onAutoplayBlocked: () => {
+      try { onAutoplayBlocked && onAutoplayBlocked(); } catch {}
     },
   });
 
@@ -148,6 +151,10 @@ export function useVoice(config, { onStart, onEnd } = {}) {
   return {
     speak,
     cancel,
+    pause: () => { try { realtime.pause(); } catch {} },
+    resume: () => { try { realtime.resume(); } catch {} },
+    enableAudio: () => { try { realtime.enableAudio(); } catch {} },
+    isPaused: () => { try { return !!realtime.isPaused(); } catch { return false; } },
     isSpeaking: () => speakingRef.current,
   };
 }

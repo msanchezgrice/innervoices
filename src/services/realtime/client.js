@@ -36,6 +36,7 @@ export class RealtimeClient {
     this.onError = options.onError || ((e) => console.error("[Realtime] Error:", e));
     this.onStateChange = options.onStateChange || (() => {});
     this.onToolCall = options.onToolCall || (() => {});
+    this.onAutoplayBlocked = options.onAutoplayBlocked || (() => {});
 
     // Runtime
     this._fnCalls = {}; // aggregate function/tool call arguments by call_id
@@ -44,6 +45,7 @@ export class RealtimeClient {
     this.token = null;
     this.systemInstructions = options.instructions || null;
     this.micEnabled = !!options.micEnabled;
+    this.autoplayBlocked = false;
 
     this.audioEl = null;
     this.audioStream = null;
@@ -139,6 +141,8 @@ export class RealtimeClient {
       // Attempt to play (may require user gesture depending on browser policy)
       this.audioEl.play().catch((err) => {
         console.warn("[Realtime] Autoplay prevented:", err?.message || err);
+        this.autoplayBlocked = true;
+        try { this.onAutoplayBlocked(); } catch {}
       });
     };
 
@@ -277,6 +281,44 @@ export class RealtimeClient {
       }
     } catch {}
     this._setState({ speaking: false });
+  }
+
+  // Pause only the local audio playback (stream continues)
+  pause() {
+    try {
+      if (this.audioEl) {
+        this.audioEl.pause();
+      }
+    } catch {}
+  }
+
+  // Resume local audio playback; will re-trigger autoplay blocked if policy forbids
+  resume() {
+    if (this.audioEl) {
+      this.audioEl.play().catch((err) => {
+        console.warn("[Realtime] Resume blocked:", err?.message || err);
+        this.autoplayBlocked = true;
+        try { this.onAutoplayBlocked(); } catch {}
+      });
+    }
+  }
+
+  // Attempt to enable audio after a user gesture (fixes autoplay policy)
+  enableAudio() {
+    if (this.audioEl) {
+      this.audioEl.muted = false;
+      this.audioEl.play().then(() => {
+        this.autoplayBlocked = false;
+      }).catch((err) => {
+        console.warn("[Realtime] enableAudio failed:", err?.message || err);
+        this.autoplayBlocked = true;
+        try { this.onAutoplayBlocked(); } catch {}
+      });
+    }
+  }
+
+  isPaused() {
+    return !!this.audioEl && this.audioEl.paused;
   }
 
   setSystemPrompt(instructions) {
