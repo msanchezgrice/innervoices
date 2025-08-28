@@ -22,6 +22,8 @@ export function useRealtime(config, handlers = {}) {
     onToolCall,
     onImageStart,
     onImage,
+    onUserTextDelta,
+    onUserTextDone,
     onAutoplayBlocked,
   } = handlers;
 
@@ -69,6 +71,12 @@ export function useRealtime(config, handlers = {}) {
       },
       onAutoplayBlocked: () => {
         try { onAutoplayBlocked && onAutoplayBlocked(); } catch {}
+      },
+      onUserTextDelta: (d, full) => {
+        try { onUserTextDelta && onUserTextDelta(d, full); } catch {}
+      },
+      onUserTextDone: (t) => {
+        try { onUserTextDone && onUserTextDone(t); } catch {}
       },
       onToolCall: async (name, args, callId) => {
         try {

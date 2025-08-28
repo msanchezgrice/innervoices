@@ -46,6 +46,8 @@ export function useWatcher(
   const enabledRef = useRef(Boolean(enabled));
   const noteIdRef = useRef(noteId);
   const pendingResolveRef = useRef(null);
+  const lastIngestSnapshotRef = useRef("");
+  const lastIngestAtRef = useRef(0);
 
   // Realtime session (used when aiProvider === "openai-realtime")
   const realtime = useRealtime(config, {
@@ -90,6 +92,33 @@ export function useWatcher(
           );
           // Bubble up to caller (e.g., App) so it can open the history panel
           try { typeof onImage === "function" && onImage({ image_base64, prompt }); } catch {}
+        }
+      } catch {}
+    },
+    onUserTextDelta: (d, full) => {
+      // Stream user's spoken input into the trace prompt
+      try {
+        useConfigStore.getState().setTrace({ prompt: full || "" });
+      } catch {}
+    },
+    onUserTextDone: (finalUser) => {
+      try {
+        // Finalize prompt in trace
+        useConfigStore.getState().setTrace({ prompt: finalUser || "" });
+        // Persist explicit requests from the user into Response History
+        const currentNoteId = noteIdRef.current;
+        if (currentNoteId && finalUser && finalUser.trim()) {
+          const text = finalUser.trim();
+          const isExplicit =
+            text.includes("?") ||
+            /\b(give me|can you|could you|please|what is|how do|show me|generate|create|make|summarize|synonym|explain)\b/i.test(text);
+          if (isExplicit) {
+            useConfigStore.getState().addResponseToHistory(
+              `[User] ${text}`,
+              "User (voice)",
+              currentNoteId
+            );
+          }
         }
       } catch {}
     },
@@ -168,6 +197,31 @@ export function useWatcher(
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.realtimeMicEnabled]);
+  
+  // Periodic note ingestion into Realtime conversation (no response.create)
+  useEffect(() => {
+    const INGEST_INTERVAL = Number(config?.ingestInterval ?? 30000);
+    const id = setInterval(() => {
+      try {
+        if (!enabledRef.current) return;
+        if (!realtime?.client?.addUserText) return;
+        if (!realtime?.connected) return;
+        const currentText = (textRef.current || "").trim();
+        if (!currentText) return;
+        const lines = currentText.split("\n");
+        const snapshot = lines.slice(-15).join("\n");
+        if (snapshot && snapshot !== lastIngestSnapshotRef.current) {
+          realtime.client.addUserText(snapshot);
+          lastIngestSnapshotRef.current = snapshot;
+          lastIngestAtRef.current = Date.now();
+        }
+      } catch (e) {
+        try { typeof onError === "function" && onError(e); } catch {}
+      }
+    }, INGEST_INTERVAL);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.ingestInterval, realtime?.connected]);
   
   useEffect(() => {
     const WATCH_INTERVAL = Number(config?.watchInterval ?? 5000);

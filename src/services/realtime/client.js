@@ -37,6 +37,8 @@ export class RealtimeClient {
     this.onStateChange = options.onStateChange || (() => {});
     this.onToolCall = options.onToolCall || (() => {});
     this.onAutoplayBlocked = options.onAutoplayBlocked || (() => {});
+    this.onUserTextDelta = options.onUserTextDelta || (() => {});
+    this.onUserTextDone = options.onUserTextDone || (() => {});
 
     // Runtime
     this._fnCalls = {}; // aggregate function/tool call arguments by call_id
@@ -54,6 +56,8 @@ export class RealtimeClient {
 
     // Accumulate text for current response
     this._activeTextBuffer = "";
+    // Accumulate transcribed user input text (voice)
+    this._activeUserTextBuffer = "";
   }
 
   _setState(patch) {
@@ -243,6 +247,26 @@ export class RealtimeClient {
   }
 
   /**
+   * Add a user message (input_text) to the conversation without triggering a response.
+   * Useful for periodically ingesting the user's note content so the assistant has context.
+   */
+  addUserText(text) {
+    if (!this.dc || this.dc.readyState !== "open") return;
+    try {
+      this.dc.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: String(text || "") }]
+        }
+      }));
+    } catch (e) {
+      this.onError(e);
+    }
+  }
+
+  /**
    * Send tool result back to the conversation and continue the response.
    */
   sendToolResult(callId, result) {
@@ -367,6 +391,37 @@ export class RealtimeClient {
     }
 
     const type = msg?.type || "";
+
+    // User input text streaming (transcription) variants
+    if (type === "response.input_text.delta" || type === "input_text.delta") {
+      const piece = typeof msg.delta === "string" ? msg.delta : (msg.delta?.text ?? "");
+      if (piece) {
+        this._activeUserTextBuffer += piece;
+        try { this.onUserTextDelta(piece, this._activeUserTextBuffer); } catch {}
+        return;
+      }
+    }
+    if (type === "response.delta" && msg.delta && typeof msg.delta === "object") {
+      const d = msg.delta;
+      if (d.type === "input_text.delta") {
+        const piece = typeof d.text === "string" ? d.text : "";
+        if (piece) {
+          this._activeUserTextBuffer += piece;
+          try { this.onUserTextDelta(piece, this._activeUserTextBuffer); } catch {}
+          return;
+        }
+      }
+    }
+    if (
+      type === "response.input_text.done" ||
+      type === "input_text.done" ||
+      (type === "response.delta" && msg.delta && typeof msg.delta === "object" && msg.delta.type === "input_text.done")
+    ) {
+      const finalUser = this._activeUserTextBuffer;
+      this._activeUserTextBuffer = "";
+      try { this.onUserTextDone(finalUser); } catch {}
+      return;
+    }
 
     // Text streaming (handle multiple delta event variants and nested payloads)
     // 1) Direct output_text/text delta with string or nested { text }
