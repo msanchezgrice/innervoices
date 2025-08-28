@@ -155,6 +155,11 @@ function App() {
         error: ok ? null : (error || "Unknown API error"),
       }));
       
+      // Clear any sticky error state if the API call succeeded
+      if (ok && useConfigStore.getState().orbState === "error") {
+        setOrbState("ready");
+      }
+
       if (!ok && useConfigStore.getState().orbState !== "muted") {
         console.log("[App] Setting orb to error state");
         setOrbState("error");
