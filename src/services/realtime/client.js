@@ -153,6 +153,20 @@ export class RealtimeClient {
     // Data channel for JSON events
     const dc = pc.createDataChannel("oai-events");
     this.dc = dc;
+
+    // Promise that resolves when the DC is open
+    this._whenOpen = new Promise((resolve) => {
+      if (dc.readyState === "open") {
+        resolve();
+      } else {
+        const prev = dc.onopen;
+        dc.onopen = (...args) => {
+          try { typeof prev === "function" && prev(...args); } catch {}
+          resolve();
+        };
+      }
+    });
+
     dc.onmessage = (evt) => this._handleDataEvent(evt);
     dc.onopen = () => {
       // connection open after SDP exchange completes
@@ -197,6 +211,8 @@ export class RealtimeClient {
     }
 
     await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
+    // Wait for data channel to be open before resolving connect()
+    try { await this.whenOpen(10000); } catch (e) { this.onError(e); }
 
     // Optional: set session-level instructions after connect (if needed)
     if (this.systemInstructions) {
@@ -212,9 +228,11 @@ export class RealtimeClient {
    */
   sendText(text, options = {}) {
     if (!this.dc || this.dc.readyState !== "open") {
-      const e = new Error("Realtime data channel not open");
-      this.onError(e);
-      throw e;
+      // Wait for the DC to open (up to 10s) before failing
+      return this.whenOpen(10000).then(() => this.sendText(text, options)).catch((err) => {
+        this.onError(err);
+        throw err;
+      });
     }
     const instructions = options.instructions || this.systemInstructions || undefined;
     const modalities = options.modalities || ["text", "audio"];
@@ -229,11 +247,9 @@ export class RealtimeClient {
         ...(instructions ? { instructions } : {}),
         modalities,
         ...(tools && tools.length ? { tools, tool_choice: "auto" } : {}),
+        // Realtime expects a flat input array of input_* items
         input: [
-          {
-            role: "user",
-            content: [{ type: "input_text", text: String(text || "") }],
-          },
+          { type: "input_text", text: String(text || "") }
         ],
       },
     };
@@ -264,6 +280,19 @@ export class RealtimeClient {
     } catch (e) {
       this.onError(e);
     }
+  }
+
+  /**
+   * Wait until the data channel is open.
+   */
+  whenOpen(timeoutMs = 10000) {
+    if (this.dc && this.dc.readyState === "open") return Promise.resolve();
+    const base = this._whenOpen instanceof Promise ? this._whenOpen : Promise.reject(new Error("No data channel"));
+    if (!timeoutMs) return base;
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error("Data channel open timeout")), timeoutMs);
+      base.then(() => { clearTimeout(t); resolve(); }).catch((e) => { clearTimeout(t); reject(e); });
+    });
   }
 
   /**

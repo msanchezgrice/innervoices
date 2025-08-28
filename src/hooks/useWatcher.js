@@ -290,6 +290,11 @@ export function useWatcher(
           try {
             // Ensure connection
             await realtime.connect({ micEnabled: !!config?.realtimeMicEnabled });
+            // Ensure data channel is open before sending
+            try { await realtime.client?.whenOpen?.(10000); } catch (e) {
+              onApiEnd && onApiEnd({ provider: "openai-realtime", model: realtime?.model, ms: 0, ok: false, error: e?.message || String(e) });
+              throw e;
+            }
           } catch (e) {
             // If realtime connect fails, surface error and bail this tick
             onApiEnd && onApiEnd({ provider: "openai-realtime", model: realtime?.model, ms: 0, ok: false, error: e?.message || String(e) });
@@ -297,16 +302,40 @@ export function useWatcher(
           }
 
           // Wait for completion via onTextDone handler
-          await new Promise((resolve) => {
+          await new Promise(async (resolve, reject) => {
             pendingResolveRef.current = resolve;
-            try {
-              realtime.sendText(composed, { modalities: ["text", "audio"] });
-            } catch (e) {
-              // immediate send failure - resolve and rethrow
-              pendingResolveRef.current = null;
-              resolve();
-              throw e;
-            }
+
+            const trySend = async (attempt = 1) => {
+              try {
+                // Double-check channel state right before send
+                if (typeof realtime.client?.whenOpen === "function") {
+                  await realtime.client.whenOpen(10000);
+                }
+                realtime.sendText(composed, { modalities: ["text", "audio"] });
+              } catch (e) {
+                const msg = String(e?.message || e || "");
+                const canRetry = attempt < 2 && /not open|timeout/i.test(msg);
+                if (canRetry) {
+                  // brief backoff and retry once
+                  try {
+                    await new Promise((r) => setTimeout(r, 300));
+                    if (typeof realtime.client?.whenOpen === "function") {
+                      await realtime.client.whenOpen(10000);
+                    }
+                    return trySend(2);
+                  } catch (e2) {
+                    pendingResolveRef.current = null;
+                    resolve();
+                    return reject(e2);
+                  }
+                }
+                pendingResolveRef.current = null;
+                resolve();
+                return reject(e);
+              }
+            };
+
+            trySend();
           });
 
           const ms = Date.now() - t0;
