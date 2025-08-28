@@ -195,6 +195,15 @@ function App() {
         const imageMatch = (r || "").match(/(?:^|\n)IMAGE:\s*(.+)/i);
         if (imageMatch && imageMatch[1]) {
           const imagePrompt = imageMatch[1].trim();
+
+          // Insert a simple text placeholder into the note
+          if (activeNote) {
+            updateContent(
+              activeNote.id,
+              (activeNote.content || "") + `\n⏳ Generating image: "${imagePrompt}" …`
+            );
+          }
+
           try {
             const resp = await fetch("/api/generate-image", {
               method: "POST",
@@ -212,13 +221,35 @@ function App() {
                 );
                 // Open the Response History panel to show the generated image
                 setShowResponseHistory(true);
+
+                // Append ready line to note
+                if (activeNote) {
+                  updateContent(
+                    activeNote.id,
+                    (activeNote.content || "") + `\n✅ Image ready for "${imagePrompt}". Open Response History to copy/paste.`
+                  );
+                }
               }
             } else {
               const txt = await resp.text();
               console.error("[App] Image generation failed:", resp.status, txt);
+              // Append failure line to note
+              if (activeNote) {
+                updateContent(
+                  activeNote.id,
+                  (activeNote.content || "") + `\n❌ Image generation failed (${resp.status}).`
+                );
+              }
             }
           } catch (e) {
             console.error("[App] Image generation error:", e);
+            // Append error line to note
+            if (activeNote) {
+              updateContent(
+                activeNote.id,
+                (activeNote.content || "") + `\n❌ Image generation error.`
+              );
+            }
           }
         }
       } else {
@@ -247,8 +278,24 @@ function App() {
         setOrbState("idle");
       }
     },
-    onImage: () => {
-      // Auto-open Response History panel when an image is generated
+    onImageStart: ({ prompt, size } = {}) => {
+      // Insert a simple text placeholder into the note
+      if (activeNote) {
+        updateContent(
+          activeNote.id,
+          (activeNote.content || "") + `\n⏳ Generating image: "${prompt || ""}" …`
+        );
+      }
+    },
+    onImage: ({ image_base64, prompt, size } = {}) => {
+      // Append ready line to note and open Response History panel
+      if (activeNote) {
+        updateContent(
+          activeNote.id,
+          (activeNote.content || "") + `\n✅ Image ready for "${prompt || ""}". Open Response History to copy/paste.`
+        );
+      }
+      // Auto-open Response History panel to show the generated image
       setShowResponseHistory(true);
     },
     onComment: (commentary) => {

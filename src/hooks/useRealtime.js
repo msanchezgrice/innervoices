@@ -20,6 +20,7 @@ export function useRealtime(config, handlers = {}) {
     onError,
     onStateChange,
     onToolCall,
+    onImageStart,
     onImage,
     onAutoplayBlocked,
   } = handlers;
@@ -78,6 +79,7 @@ export function useRealtime(config, handlers = {}) {
               clientRef.current?.sendToolResult(callId, { error: "missing_prompt" });
               return;
             }
+            try { onImageStart && onImageStart({ prompt, size }); } catch {}
             const resp = await fetch("/api/generate-image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },

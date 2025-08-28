@@ -1,7 +1,7 @@
 export const DEFAULT_CONFIG = {
   // Timing
-  watchInterval: 5000, // How often to check for changes (ms)
-  commentInterval: 10000, // Minimum time between comments (ms)
+  watchInterval: 30000, // How often to check for changes (ms)
+  commentInterval: 60000, // Minimum time between comments (ms)
 
   // Voice (browser TTS)
   voiceEnabled: true,
@@ -44,7 +44,7 @@ export const DEFAULT_CONFIG = {
   escalateOnInaction: true, // gently escalate tone if no action taken
 
   // AI Behavior
-  commentProbability: 0.3, // 0-1, chance of commenting
+  commentProbability: 0.5, // 0-1, chance of commenting
   maxCommentLength: 200, // words (post-truncation safety)
   creativity: 0.7, // 0-1, AI temperature
 

@@ -48,6 +48,27 @@ export default async function handler(req, res) {
       voice,
       // You can optionally set default modalities at session level
       modalities: ["text", "audio"],
+      // Register session-level tools so voice-initiated turns can call them.
+      tools: [
+        {
+          type: "function",
+          name: "generate_image",
+          description: "Generate an image with the given prompt and optional size.",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: { type: "string", description: "Detailed image prompt" },
+              size: {
+                type: "string",
+                enum: ["512x512", "1024x1024", "2048x2048"],
+                description: "Image size"
+              }
+            },
+            required: ["prompt"]
+          }
+        }
+      ],
+      tool_choice: "auto",
       // You can set "instructions" server-side if you want a fixed system prompt,
       // but we will send instructions per-response from the client for flexibility.
     };

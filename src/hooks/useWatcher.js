@@ -32,6 +32,7 @@ export function useWatcher(
     onMeta,
     onAudioStart,
     onAudioEnd,
+    onImageStart,
     onImage,
     enabled = true,
     noteId = null,
@@ -48,6 +49,11 @@ export function useWatcher(
 
   // Realtime session (used when aiProvider === "openai-realtime")
   const realtime = useRealtime(config, {
+    onTextDelta: (delta, full) => {
+      try {
+        useConfigStore.getState().setTrace({ response: full || "" });
+      } catch {}
+    },
     onTextDone: (finalText) => {
       // Bubble text to caller and trigger comment
       try {
@@ -64,6 +70,11 @@ export function useWatcher(
       if (typeof fn === "function") {
         try { fn(); } catch {}
       }
+    },
+    onImageStart: ({ prompt, size }) => {
+      try {
+        if (typeof onImageStart === "function") onImageStart({ prompt, size });
+      } catch {}
     },
     onImage: ({ image_base64, prompt }) => {
       // When tool-based image returns, push it to history for the current note
@@ -120,7 +131,44 @@ export function useWatcher(
     noteIdRef.current = noteId;
     console.log("[Watcher] noteId updated to:", noteId);
   }, [noteId]);
+  
+  // Eagerly connect/disconnect realtime on enable toggles
+  useEffect(() => {
+    (async () => {
+      try {
+        if (Boolean(enabled)) {
+          // reset snapshot so ingestion can re-trigger
+          lastSnapshotRef.current = "";
+          await realtime.connect({ micEnabled: !!config?.realtimeMicEnabled });
+        } else {
+          try { realtime.cancel && realtime.cancel(); } catch {}
+          try { await realtime.disconnect?.(); } catch {}
+          pendingResolveRef.current = null;
+          runningRef.current = false;
+        }
+      } catch (e) {
+        try { typeof onError === "function" && onError(e); } catch {}
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled]);
 
+  // Reconnect when mic toggle changes while enabled
+  useEffect(() => {
+    (async () => {
+      if (!enabledRef.current) return;
+      try {
+        await realtime.disconnect?.();
+      } catch {}
+      try {
+        await realtime.connect({ micEnabled: !!config?.realtimeMicEnabled });
+      } catch (e) {
+        try { typeof onError === "function" && onError(e); } catch {}
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.realtimeMicEnabled]);
+  
   useEffect(() => {
     const WATCH_INTERVAL = Number(config?.watchInterval ?? 5000);
     const COMMENT_INTERVAL = Number(config?.commentInterval ?? 10000);
