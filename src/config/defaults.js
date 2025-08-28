@@ -20,7 +20,7 @@ export const DEFAULT_CONFIG = {
 
   // Realtime features
   enableRealtimeTools: true, // allow Realtime tool-calls (e.g., generate_image)
-  realtimeMicEnabled: false, // capture mic and send upstream via WebRTC (opt-in)
+  realtimeMicEnabled: true, // capture mic and send upstream via WebRTC (default ON)
   imageDefaultSize: "1024x1024", // default size for generated images
 
   // AI Provider & Models

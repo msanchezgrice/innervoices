@@ -20,7 +20,27 @@ const persistedHistory = (() => {
 })();
 
 export const useConfigStore = create((set, get) => ({
-  config: persisted || DEFAULT_CONFIG,
+  config: (() => {
+    let cfg = persisted || DEFAULT_CONFIG;
+    const needsMigration = !cfg?.configVersion || cfg.configVersion < 2;
+    if (needsMigration) {
+      cfg = {
+        ...cfg,
+        aiProvider: "openai-realtime",
+        ttsProvider: "openai-realtime",
+        voiceEnabled: true,
+        openaiRealtimeVoice: cfg?.openaiRealtimeVoice || "alloy",
+        openaiRealtimeModel: cfg?.openaiRealtimeModel || "gpt-4o-realtime-preview",
+        enableRealtimeTools: cfg?.enableRealtimeTools !== false,
+        realtimeMicEnabled: true,
+        configVersion: 2,
+      };
+      try {
+        localStorage.setItem("iv_config", JSON.stringify(cfg));
+      } catch {}
+    }
+    return cfg;
+  })(),
   responseHistory: persistedHistory, // Now an object keyed by note ID
   updateConfig: (partial) =>
     set((state) => {

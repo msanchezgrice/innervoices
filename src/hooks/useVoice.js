@@ -51,14 +51,20 @@ export function useVoice(config, { onStart, onEnd } = {}) {
   const speak = async (text) => {
     if (!text || !config?.voiceEnabled) return;
 
+    // Prefer ElevenLabs env key over panel key
+    const envEL =
+      import.meta.env.VITE_ELEVENLABS_API_KEY || import.meta.env.ELEVEN_LABS_API_KEY || "";
+    const hasEnvEL = !!(envEL && String(envEL).trim());
+    const apiKeyToUse = hasEnvEL ? envEL : (config?.elevenlabsApiKey || "");
+
     // Prefer ElevenLabs if explicitly selected
-    if (config?.ttsProvider === "elevenlabs" && config?.elevenlabsApiKey) {
+    if (config?.ttsProvider === "elevenlabs" && apiKeyToUse) {
       try {
         // Resolve ElevenLabs voice ID if missing but a preferred voice name is provided
         let resolvedVoiceId = config?.elevenlabsVoiceId;
         if (!resolvedVoiceId && config?.elevenlabsVoiceName) {
           try {
-            const voices = await listElevenLabsVoices(config.elevenlabsApiKey);
+            const voices = await listElevenLabsVoices(apiKeyToUse);
             const match = voices.find(
               (v) =>
                 (v?.name || "").toLowerCase() ===
@@ -87,7 +93,7 @@ export function useVoice(config, { onStart, onEnd } = {}) {
           const controller = await speakWithElevenLabs(
             text,
             {
-              apiKey: config.elevenlabsApiKey,
+              apiKey: apiKeyToUse,
               voiceId: resolvedVoiceId,
             },
             {

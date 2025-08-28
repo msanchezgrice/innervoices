@@ -125,6 +125,8 @@ export function useWatcher(
 
     const handleTick = async () => {
       const provider = String(config?.aiProvider || "").toLowerCase();
+      const tts = String(config?.ttsProvider || "").toLowerCase();
+      const shouldUseRealtime = provider === "openai-realtime" || tts === "openai-realtime";
       if (!enabledRef.current) return;
       if (runningRef.current) return;
 
@@ -159,8 +161,14 @@ export function useWatcher(
           provider,
           timestamp: new Date().toISOString()
         });
+        console.log("[Watcher] Mode", {
+          mode: shouldUseRealtime ? "realtime" : "responses",
+          realtimeModel: config?.openaiRealtimeModel,
+          realtimeVoice: config?.openaiRealtimeVoice,
+          ttsProvider: tts
+        });
 
-        if (provider === "openai-realtime") {
+        if (shouldUseRealtime) {
           // Build prompt with context + history
           const ctx = detectContext(currentText);
           const composed = buildPrompt(currentText, config, ctx, responseHistory);
