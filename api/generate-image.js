@@ -45,21 +45,21 @@ export default async function handler(req, res) {
       return;
     }
 
-    const size = body.size || process.env.IMAGE_SIZE || process.env.VITE_IMAGE_SIZE || "1024x1024";
-    const quality = body.quality || process.env.IMAGE_QUALITY || "standard";
+    const requestedSize = body.size || process.env.IMAGE_SIZE || process.env.VITE_IMAGE_SIZE || "1024x1024";
+    const allowedSizes = new Set(["512x512", "1024x1024", "1792x1024", "1024x1792"]);
+    const size = allowedSizes.has(requestedSize) ? requestedSize : "1024x1024";
 
     // Prefer the new 'v1/images' endpoint for gpt-image-1.
     // If the deployment doesn't support it yet, we fallback to 'v1/images/generations'.
     const payload = {
       model: "gpt-image-1",
       prompt,
-      size,
-      quality,
+      size
       // background: "transparent" // Uncomment if you want transparent backgrounds and your plan supports it
     };
 
-    async function callImages(url) {
-      const r = await fetch(url, {
+    async function callImagesGenerations() {
+      const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -71,15 +71,15 @@ export default async function handler(req, res) {
       return { ok: r.ok, status: r.status, text };
     }
 
-    // Try primary endpoint
-    let result = await callImages("https://api.openai.com/v1/images");
-    if (!result.ok) {
-      // Fallback to legacy generations endpoint
-      result = await callImages("https://api.openai.com/v1/images/generations");
-    }
+    const result = await callImagesGenerations();
 
     if (!result.ok) {
-      res.status(result.status).send(result.text);
+      let msg = result.text;
+      try {
+        const parsed = JSON.parse(result.text);
+        msg = parsed?.error?.message || msg;
+      } catch {}
+      res.status(result.status).json({ error: msg || "Image generation failed", detail: result.text });
       return;
     }
 

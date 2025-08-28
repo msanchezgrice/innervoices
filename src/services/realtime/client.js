@@ -368,14 +368,35 @@ export class RealtimeClient {
 
     const type = msg?.type || "";
 
-    // Text streaming
-    if (type === "response.output_text.delta" && typeof msg.delta === "string") {
-      this._activeTextBuffer += msg.delta;
-      try { this.onTextDelta(msg.delta, this._activeTextBuffer); } catch {}
-      return;
+    // Text streaming (handle multiple delta event variants and nested payloads)
+    // 1) Direct output_text/text delta with string or nested { text }
+    if (type === "response.output_text.delta" || type === "response.text.delta") {
+      const piece = typeof msg.delta === "string" ? msg.delta : (msg.delta?.text ?? "");
+      if (piece) {
+        this._activeTextBuffer += piece;
+        try { this.onTextDelta(piece, this._activeTextBuffer); } catch {}
+        return;
+      }
+    }
+    // 2) Generic response.delta with nested shape: { delta: { type: "output_text.delta", text: "..." } }
+    if (type === "response.delta" && msg.delta && typeof msg.delta === "object") {
+      const d = msg.delta;
+      if (d.type === "output_text.delta") {
+        const piece = typeof d.text === "string" ? d.text : "";
+        if (piece) {
+          this._activeTextBuffer += piece;
+          try { this.onTextDelta(piece, this._activeTextBuffer); } catch {}
+          return;
+        }
+      }
     }
 
-    if (type === "response.output_text.done" || type === "response.completed") {
+    if (
+      type === "response.output_text.done" ||
+      type === "response.text.done" ||
+      type === "response.completed" ||
+      (type === "response.delta" && msg.delta && typeof msg.delta === "object" && msg.delta.type === "output_text.done")
+    ) {
       const finalText = this._activeTextBuffer;
       this._activeTextBuffer = "";
       try { this.onTextDone(finalText); } catch {}
