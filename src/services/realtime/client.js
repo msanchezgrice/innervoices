@@ -241,21 +241,29 @@ export class RealtimeClient {
     // Reset active buffer for a new response
     this._activeTextBuffer = "";
 
-    const event = {
+    // Compatibility flow on prod: first create a message item, then ask for a response
+    const createItem = {
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        // Use 'text' content for compatibility with some deployments
+        content: [{ type: "text", text: String(text || "") }]
+      }
+    };
+
+    const createResponse = {
       type: "response.create",
       response: {
         ...(instructions ? { instructions } : {}),
-        modalities,
+        ...(modalities ? { modalities } : {}),
         ...(tools && tools.length ? { tools, tool_choice: "auto" } : {}),
-        // Realtime expects a flat input array of input_* items
-        input: [
-          { type: "input_text", text: String(text || "") }
-        ],
-      },
+      }
     };
 
     try {
-      this.dc.send(JSON.stringify(event));
+      this.dc.send(JSON.stringify(createItem));
+      this.dc.send(JSON.stringify(createResponse));
     } catch (e) {
       this.onError(e);
       throw e;
@@ -274,7 +282,8 @@ export class RealtimeClient {
         item: {
           type: "message",
           role: "user",
-          content: [{ type: "input_text", text: String(text || "") }]
+          // Use 'text' content for compatibility with some deployments
+          content: [{ type: "text", text: String(text || "") }]
         }
       }));
     } catch (e) {
