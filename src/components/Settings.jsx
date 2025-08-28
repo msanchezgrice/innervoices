@@ -526,6 +526,37 @@ export default function Settings() {
                 placeholder="e.g., gpt-4o-realtime-preview"
               />
             </div>
+
+            <label className="flex items-center gap-2 mb-1">
+              <input
+                type="checkbox"
+                checked={!!config.enableRealtimeTools}
+                onChange={(e) => updateConfig({ enableRealtimeTools: e.target.checked })}
+              />
+              <span className="text-sm">Enable Realtime Image Tool</span>
+            </label>
+
+            <label className="flex items-center gap-2 mb-3">
+              <input
+                type="checkbox"
+                checked={!!config.realtimeMicEnabled}
+                onChange={(e) => updateConfig({ realtimeMicEnabled: e.target.checked })}
+              />
+              <span className="text-sm">Enable Mic (Realtime)</span>
+            </label>
+
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">Default Image Size</label>
+              <select
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                value={config.imageDefaultSize || "1024x1024"}
+                onChange={(e) => updateConfig({ imageDefaultSize: e.target.value })}
+              >
+                <option value="512x512">512x512</option>
+                <option value="1024x1024">1024x1024</option>
+                <option value="2048x2048">2048x2048</option>
+              </select>
+            </div>
           </>
         )}
 

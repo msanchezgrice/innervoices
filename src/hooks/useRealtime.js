@@ -19,6 +19,8 @@ export function useRealtime(config, handlers = {}) {
     onAudioEnd,
     onError,
     onStateChange,
+    onToolCall,
+    onImage,
   } = handlers;
 
   const [connected, setConnected] = useState(false);
@@ -63,6 +65,36 @@ export function useRealtime(config, handlers = {}) {
         setSpeaking(!!s?.speaking);
         try { onStateChange && onStateChange(s); } catch {}
       },
+      onToolCall: async (name, args, callId) => {
+        try {
+          if (name === "generate_image") {
+            const prompt = String(args?.prompt || "").trim();
+            const size = args?.size || (config?.imageDefaultSize || "1024x1024");
+            if (!prompt) {
+              clientRef.current?.sendToolResult(callId, { error: "missing_prompt" });
+              return;
+            }
+            const resp = await fetch("/api/generate-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt, size })
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              clientRef.current?.sendToolResult(callId, { image_base64: data?.image_base64, prompt, size });
+              try { onImage && onImage({ image_base64: data?.image_base64, prompt, size }); } catch {}
+            } else {
+              const txt = await resp.text();
+              clientRef.current?.sendToolResult(callId, { error: "image_generation_failed", detail: txt });
+            }
+            return;
+          }
+          // Bubble unknown tools up if provided
+          try { onToolCall && onToolCall(name, args, callId); } catch {}
+        } catch (e) {
+          clientRef.current?.sendToolResult(callId, { error: e?.message || "tool_error" });
+        }
+      },
     });
   }
 
@@ -96,8 +128,31 @@ export function useRealtime(config, handlers = {}) {
   const sendText = useCallback((text, options = {}) => {
     const client = clientRef.current;
     if (!client) throw new Error("Realtime client not initialized");
-    client.sendText(text, options);
-  }, []);
+    const tools = config?.enableRealtimeTools ? [{
+      type: "function",
+      name: "generate_image",
+      description: "Generate an image with the given prompt and optional size.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "Detailed image prompt" },
+          size: {
+            type: "string",
+            enum: ["512x512", "1024x1024", "2048x2048"],
+            description: "Image size"
+          }
+        },
+        required: ["prompt"]
+      }
+    }] : undefined;
+
+    client.sendText(text, {
+      ...options,
+      tools,
+      modalities: options.modalities || ["text", "audio"],
+      instructions: buildSystemPrompt(config || {}),
+    });
+  }, [config?.enableRealtimeTools, config?.imageDefaultSize, config?.shipModeEnabled, config?.systemPrompt, config?.personality, config?.tone]);
 
   const cancel = useCallback(() => {
     const client = clientRef.current;

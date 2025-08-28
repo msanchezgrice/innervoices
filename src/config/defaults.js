@@ -18,6 +18,11 @@ export const DEFAULT_CONFIG = {
   elevenlabsVoiceId: "",
   elevenlabsVoiceName: "Michael C Vincent",
 
+  // Realtime features
+  enableRealtimeTools: true, // allow Realtime tool-calls (e.g., generate_image)
+  realtimeMicEnabled: false, // capture mic and send upstream via WebRTC (opt-in)
+  imageDefaultSize: "1024x1024", // default size for generated images
+
   // AI Provider & Models
   aiProvider: "openai-realtime", // "openai-realtime" | "openai" | "anthropic"
   openaiApiKey: (import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.OPENAI_API_KEY || ""),

@@ -64,6 +64,21 @@ export function useWatcher(
         try { fn(); } catch {}
       }
     },
+    onImage: ({ image_base64, prompt }) => {
+      // When tool-based image returns, push it to history for the current note
+      try {
+        const currentNoteId = noteIdRef.current;
+        const trace = useConfigStore.getState().trace;
+        if (currentNoteId && image_base64) {
+          useConfigStore.getState().addResponseToHistory(
+            "",
+            trace.model || "Unknown",
+            currentNoteId,
+            { image_base64, image_prompt: prompt }
+          );
+        }
+      } catch {}
+    },
     onAudioStart: () => {
       try {
         if (typeof onAudioStart === "function") onAudioStart();
@@ -161,7 +176,7 @@ export function useWatcher(
 
           try {
             // Ensure connection
-            await realtime.connect({ micEnabled: false });
+            await realtime.connect({ micEnabled: !!config?.realtimeMicEnabled });
           } catch (e) {
             // If realtime connect fails, surface error and bail this tick
             onApiEnd && onApiEnd({ provider: "openai-realtime", model: realtime?.model, ms: 0, ok: false, error: e?.message || String(e) });

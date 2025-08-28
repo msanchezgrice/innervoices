@@ -35,8 +35,10 @@ export class RealtimeClient {
     this.onAudioEnd = options.onAudioEnd || (() => {});
     this.onError = options.onError || ((e) => console.error("[Realtime] Error:", e));
     this.onStateChange = options.onStateChange || (() => {});
+    this.onToolCall = options.onToolCall || (() => {});
 
     // Runtime
+    this._fnCalls = {}; // aggregate function/tool call arguments by call_id
     this.pc = null;
     this.dc = null;
     this.token = null;
@@ -208,6 +210,7 @@ export class RealtimeClient {
     }
     const instructions = options.instructions || this.systemInstructions || undefined;
     const modalities = options.modalities || ["text", "audio"];
+    const tools = Array.isArray(options.tools) ? options.tools : undefined;
 
     // Reset active buffer for a new response
     this._activeTextBuffer = "";
@@ -217,6 +220,7 @@ export class RealtimeClient {
       response: {
         ...(instructions ? { instructions } : {}),
         modalities,
+        ...(tools && tools.length ? { tools, tool_choice: "auto" } : {}),
         input: [
           {
             role: "user",
@@ -231,6 +235,28 @@ export class RealtimeClient {
     } catch (e) {
       this.onError(e);
       throw e;
+    }
+  }
+
+  /**
+   * Send tool result back to the conversation and continue the response.
+   */
+  sendToolResult(callId, result) {
+    if (!this.dc || this.dc.readyState !== "open") return;
+    try {
+      // Provide function/tool output tied to a specific call_id
+      this.dc.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: callId,
+          output: JSON.stringify(result ?? {})
+        }
+      }));
+      // Ask the model to continue now that the tool output is available
+      this.dc.send(JSON.stringify({ type: "response.create" }));
+    } catch (e) {
+      this.onError(e);
     }
   }
 
@@ -323,6 +349,29 @@ export class RealtimeClient {
     if (type === "response.output_audio.completed") {
       this._setState({ speaking: false });
       try { this.onAudioEnd(); } catch {}
+      return;
+    }
+
+    // Function/tool call arguments streaming (aggregate per call_id)
+    if (type === "response.function_call_arguments.delta") {
+      const callId = msg.call_id || msg.id;
+      if (callId) {
+        const current = this._fnCalls[callId] || { name: msg.name || "", argsText: "" };
+        current.name = msg.name || current.name || "";
+        current.argsText = (current.argsText || "") + (msg.delta || "");
+        this._fnCalls[callId] = current;
+      }
+      return;
+    }
+    if (type === "response.function_call_arguments.done") {
+      const callId = msg.call_id || msg.id;
+      const rec = callId ? this._fnCalls[callId] : null;
+      if (rec) {
+        let parsed = {};
+        try { parsed = rec.argsText ? JSON.parse(rec.argsText) : {}; } catch {}
+        try { this.onToolCall && this.onToolCall(rec.name || msg.name || "", parsed, callId); } catch {}
+        delete this._fnCalls[callId];
+      }
       return;
     }
 
