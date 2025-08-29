@@ -201,16 +201,79 @@ export function useWatcher(
   // Periodic note ingestion into Realtime conversation (no response.create)
   useEffect(() => {
     const INGEST_INTERVAL = Number(config?.ingestInterval ?? 30000);
+
+    // Render the latest note snapshot into a PNG data URL (no external deps)
+    function renderTextToDataUrl(text, opts = {}) {
+      try {
+        const width = Number(opts.width ?? 800);
+        const padding = Number(opts.padding ?? 16);
+        const font = opts.font || "14px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif";
+        const lineHeight = Number(opts.lineHeight ?? 20);
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.font = font;
+
+        // Simple word-wrap
+        const words = String(text || "").split(/\s+/);
+        const maxTextWidth = width - padding * 2;
+        const lines = [];
+        let line = "";
+        for (const word of words) {
+          const test = line ? line + " " + word : word;
+          if (ctx.measureText(test).width > maxTextWidth) {
+            if (line) lines.push(line);
+            line = word;
+          } else {
+            line = test;
+          }
+        }
+        if (line) lines.push(line);
+
+        const height = padding * 2 + Math.max(1, lines.length) * lineHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        // Background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+
+        // Text
+        ctx.fillStyle = "#111827";
+        ctx.font = font;
+        let y = padding + lineHeight * 0.9;
+        for (const l of lines) {
+          ctx.fillText(l, padding, y);
+          y += lineHeight;
+        }
+        return canvas.toDataURL("image/png");
+      } catch {
+        return null;
+      }
+    }
+
     const id = setInterval(() => {
       try {
         if (!enabledRef.current) return;
-        if (!realtime?.client?.addUserText) return;
         if (!realtime?.connected) return;
+
         const currentText = (textRef.current || "").trim();
         if (!currentText) return;
+
         const lines = currentText.split("\n");
         const snapshot = lines.slice(-15).join("\n");
-        if (snapshot && snapshot !== lastIngestSnapshotRef.current) {
+        if (!snapshot || snapshot === lastIngestSnapshotRef.current) return;
+
+        const mode = (config?.ingestMode || "text").toLowerCase();
+
+        if (mode === "image" && typeof realtime?.client?.addUserImage === "function") {
+          const dataUrl = renderTextToDataUrl(snapshot);
+          if (dataUrl) {
+            realtime.client.addUserImage(dataUrl);
+            lastIngestSnapshotRef.current = snapshot;
+            lastIngestAtRef.current = Date.now();
+          }
+        } else if (typeof realtime?.client?.addUserText === "function") {
           realtime.client.addUserText(snapshot);
           lastIngestSnapshotRef.current = snapshot;
           lastIngestAtRef.current = Date.now();
@@ -221,7 +284,7 @@ export function useWatcher(
     }, INGEST_INTERVAL);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.ingestInterval, realtime?.connected]);
+  }, [config?.ingestInterval, config?.ingestMode, realtime?.connected]);
   
   useEffect(() => {
     const WATCH_INTERVAL = Number(config?.watchInterval ?? 5000);

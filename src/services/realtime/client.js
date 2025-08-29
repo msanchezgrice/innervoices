@@ -51,6 +51,7 @@ export class RealtimeClient {
 
     this.audioEl = null;
     this.audioStream = null;
+    this.micStream = null;
     this.connected = false;
     this.speaking = false;
 
@@ -71,6 +72,8 @@ export class RealtimeClient {
 
   async connect({ micEnabled, instructions, model, voice } = {}) {
     if (this.connected) return;
+    // Track attempts to allow a single auto-retry on DC open failure
+    this._connectAttempt = (this._connectAttempt || 0) + 1;
     if (typeof micEnabled === "boolean") this.micEnabled = micEnabled;
     if (instructions) this.systemInstructions = instructions;
     if (model) this.model = model;
@@ -111,6 +114,7 @@ export class RealtimeClient {
     if (this.micEnabled) {
       try {
         const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.micStream = media;
         for (const track of media.getTracks()) {
           pc.addTrack(track, media);
         }
@@ -212,7 +216,17 @@ export class RealtimeClient {
 
     await pc.setRemoteDescription({ type: "answer", sdp: answerSDP });
     // Wait for data channel to be open before resolving connect()
-    try { await this.whenOpen(10000); } catch (e) { this.onError(e); }
+    try {
+      await this.whenOpen(20000);
+    } catch (e) {
+      this.onError(e);
+      // Auto-retry once on DC open timeout/failure
+      if ((this._connectAttempt || 1) < 2) {
+        try { await this.disconnect(); } catch {}
+        return this.connect({ micEnabled: this.micEnabled, instructions: this.systemInstructions, model: this.model, voice: this.voice });
+      }
+      throw e;
+    }
 
     // Optional: set session-level instructions after connect (if needed)
     if (this.systemInstructions) {
@@ -220,6 +234,8 @@ export class RealtimeClient {
     }
 
     this._setState({ connected: true });
+    // Reset attempt counter on success
+    this._connectAttempt = 0;
   }
 
   /**
@@ -229,7 +245,7 @@ export class RealtimeClient {
   sendText(text, options = {}) {
     if (!this.dc || this.dc.readyState !== "open") {
       // Wait for the DC to open (up to 10s) before failing
-      return this.whenOpen(10000).then(() => this.sendText(text, options)).catch((err) => {
+      return this.whenOpen(20000).then(() => this.sendText(text, options)).catch((err) => {
         this.onError(err);
         throw err;
       });
@@ -247,8 +263,8 @@ export class RealtimeClient {
       item: {
         type: "message",
         role: "user",
-        // Use 'text' content for compatibility with some deployments
-        content: [{ type: "text", text: String(text || "") }]
+        // Use 'input_text' content per production schema
+        content: [{ type: "input_text", text: String(text || "") }]
       }
     };
 
@@ -282,8 +298,36 @@ export class RealtimeClient {
         item: {
           type: "message",
           role: "user",
-          // Use 'text' content for compatibility with some deployments
-          content: [{ type: "text", text: String(text || "") }]
+          // Use 'input_text' content per production schema
+          content: [{ type: "input_text", text: String(text || "") }]
+        }
+      }));
+    } catch (e) {
+      this.onError(e);
+    }
+  }
+  
+  /**
+   * Add a user image (input_image) to the conversation without triggering a response.
+   * Pass a data URL (e.g., "data:image/png;base64,..."). The model can reference it in context.
+   */
+  addUserImage(dataUrl) {
+    if (!this.dc || this.dc.readyState !== "open") return;
+    const url = String(dataUrl || "");
+    // Expect a data URL for simple ingestion (screenshots / rendered notes)
+    if (!url.startsWith("data:image")) return;
+    try {
+      this.dc.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_image",
+              image_url: url
+            }
+          ]
         }
       }));
     } catch (e) {
@@ -413,6 +457,12 @@ export class RealtimeClient {
           this.audioStream.getTracks().forEach((t) => t.stop());
         } catch {}
         this.audioStream = null;
+      }
+      if (this.micStream) {
+        try {
+          this.micStream.getTracks().forEach((t) => t.stop());
+        } catch {}
+        this.micStream = null;
       }
     } finally {
       this._setState({ connected: false, speaking: false });

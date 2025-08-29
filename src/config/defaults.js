@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG = {
   realtimeMicEnabled: true, // capture mic and send upstream via WebRTC (default ON)
   imageDefaultSize: "1024x1024", // default size for generated images
   ingestInterval: 30000, // how often to ingest latest note text into Realtime conversation (ms)
+  ingestMode: "text", // "text" | "image" — how to ingest notes into Realtime (image renders a screenshot for input_image)
 
   // AI Provider & Models
   aiProvider: "openai-realtime", // "openai-realtime" | "openai" | "anthropic"
