@@ -13,10 +13,20 @@ import OnboardingModal from "./components/OnboardingModal.jsx";
 import ResponseHistory from "./components/ResponseHistory.jsx";
 import { useRouter } from "./hooks/useRouter.js";
 
+// Build marker to verify latest bundle in production
+const BUILD_ID = "659c30e";
+
 function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showResponseHistory, setShowResponseHistory] = useState(false);
   const { currentRoute, navigateToApp, navigateToLanding } = useRouter();
+
+  // Log build marker so we can confirm the active bundle in production
+  useEffect(() => {
+    try {
+      console.info("[ShipMode] build", BUILD_ID);
+    } catch {}
+  }, []);
 
   const startFromLanding = () => {
     navigateToApp();
