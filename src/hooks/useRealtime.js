@@ -33,11 +33,11 @@ export function useRealtime(config, handlers = {}) {
   const clientRef = useRef(null);
 
   const model = useMemo(
-    () => config?.openaiRealtimeModel || import.meta.env.VITE_OPENAI_REALTIME_MODEL || "gpt-4o-realtime-preview",
+    () => config?.openaiRealtimeModel || import.meta.env.VITE_OPENAI_REALTIME_MODEL || "gpt-realtime",
     [config?.openaiRealtimeModel]
   );
   const voice = useMemo(
-    () => config?.openaiRealtimeVoice || import.meta.env.VITE_OPENAI_REALTIME_VOICE || "alloy",
+    () => config?.openaiRealtimeVoice || import.meta.env.VITE_OPENAI_REALTIME_VOICE || "cedar",
     [config?.openaiRealtimeVoice]
   );
 

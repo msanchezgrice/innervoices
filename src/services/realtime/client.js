@@ -22,11 +22,11 @@ export class RealtimeClient {
     this.model =
       options.model ||
       import.meta.env.VITE_OPENAI_REALTIME_MODEL ||
-      "gpt-4o-realtime-preview";
+      "gpt-realtime";
     this.voice =
       options.voice ||
       import.meta.env.VITE_OPENAI_REALTIME_VOICE ||
-      "alloy";
+      "cedar";
 
     // Event callbacks
     this.onTextDelta = options.onTextDelta || (() => {});

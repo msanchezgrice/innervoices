@@ -12,8 +12,8 @@ export const DEFAULT_CONFIG = {
 
   // TTS Provider
   ttsProvider: "openai-realtime", // "openai-realtime" | "elevenlabs"
-  openaiRealtimeModel: (import.meta.env.VITE_OPENAI_REALTIME_MODEL || "gpt-4o-realtime-preview"),
-  openaiRealtimeVoice: (import.meta.env.VITE_OPENAI_REALTIME_VOICE || "alloy"),
+  openaiRealtimeModel: (import.meta.env.VITE_OPENAI_REALTIME_MODEL || "gpt-realtime"),
+  openaiRealtimeVoice: (import.meta.env.VITE_OPENAI_REALTIME_VOICE || "cedar"),
   elevenlabsApiKey: (import.meta.env.VITE_ELEVENLABS_API_KEY || import.meta.env.ELEVEN_LABS_API_KEY || ""),
   elevenlabsVoiceId: "",
   elevenlabsVoiceName: "Michael C Vincent",

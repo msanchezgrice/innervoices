@@ -346,7 +346,7 @@ export function useWatcher(
           const t0 = Date.now();
           onApiStart && onApiStart({
             provider: "openai-realtime",
-            model: realtime?.model || (config?.openaiRealtimeModel || "gpt-4o-realtime-preview"),
+            model: realtime?.model || (config?.openaiRealtimeModel || "gpt-realtime"),
             promptLength: composed.length
           });
 

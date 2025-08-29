@@ -22,8 +22,9 @@ const persistedHistory = (() => {
 export const useConfigStore = create((set, get) => ({
   config: (() => {
     let cfg = persisted || DEFAULT_CONFIG;
-    const needsMigration = !cfg?.configVersion || cfg.configVersion < 2;
-    if (needsMigration) {
+
+    // Migration v2 (legacy): ensure realtime defaults existed
+    if (!cfg?.configVersion || cfg.configVersion < 2) {
       cfg = {
         ...cfg,
         aiProvider: "openai-realtime",
@@ -35,10 +36,28 @@ export const useConfigStore = create((set, get) => ({
         realtimeMicEnabled: true,
         configVersion: 2,
       };
+    }
+
+    // Migration v3: switch defaults to GA model/voice if still using old defaults or missing
+    if (!cfg?.configVersion || cfg.configVersion < 3) {
+      const next = { ...cfg };
+      if (!next.openaiRealtimeVoice || String(next.openaiRealtimeVoice).toLowerCase() === "alloy") {
+        next.openaiRealtimeVoice = "cedar";
+      }
+      if (!next.openaiRealtimeModel || String(next.openaiRealtimeModel).toLowerCase() === "gpt-4o-realtime-preview") {
+        next.openaiRealtimeModel = "gpt-realtime";
+      }
+      // Keep tools/mic enabled by default
+      next.enableRealtimeTools = next.enableRealtimeTools !== false;
+      if (typeof next.realtimeMicEnabled !== "boolean") next.realtimeMicEnabled = true;
+
+      next.configVersion = 3;
+      cfg = next;
       try {
         localStorage.setItem("iv_config", JSON.stringify(cfg));
       } catch {}
     }
+
     return cfg;
   })(),
   responseHistory: persistedHistory, // Now an object keyed by note ID

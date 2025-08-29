@@ -508,23 +508,66 @@ export default function Settings() {
           <>
             <div className="mb-3">
               <label className="block text-sm font-medium mb-1">OpenAI Realtime Voice</label>
-              <input
-                type="text"
-                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-                value={config.openaiRealtimeVoice || ""}
-                onChange={(e) => updateConfig({ openaiRealtimeVoice: e.target.value })}
-                placeholder="e.g., alloy"
-              />
+              <select
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800 mb-2"
+                value={["cedar","marin","alloy"].includes((config.openaiRealtimeVoice || "").toLowerCase()) ? (config.openaiRealtimeVoice || "").toLowerCase() : "custom"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "custom") {
+                    // Preserve current custom entry (or empty) and show the text input below
+                    updateConfig({ openaiRealtimeVoice: config.openaiRealtimeVoice || "" });
+                  } else {
+                    updateConfig({ openaiRealtimeVoice: v });
+                  }
+                }}
+              >
+                <option value="cedar">cedar (default)</option>
+                <option value="marin">marin</option>
+                <option value="alloy">alloy</option>
+                <option value="custom">Custom…</option>
+              </select>
+              {
+                !["cedar","marin","alloy"].includes((config.openaiRealtimeVoice || "").toLowerCase()) && (
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                    value={config.openaiRealtimeVoice || ""}
+                    onChange={(e) => updateConfig({ openaiRealtimeVoice: e.target.value })}
+                    placeholder="Enter a custom realtime voice (e.g., alloy, breeze, etc.)"
+                  />
+                )
+              }
+              <div className="text-[11px] text-neutral-500 mt-1">Tip: Changing model/voice may require a reconnect; the app reconnects automatically when toggling mic or watcher.</div>
             </div>
             <div className="mb-3">
               <label className="block text-sm font-medium mb-1">OpenAI Realtime Model</label>
-              <input
-                type="text"
-                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
-                value={config.openaiRealtimeModel || ""}
-                onChange={(e) => updateConfig({ openaiRealtimeModel: e.target.value })}
-                placeholder="e.g., gpt-4o-realtime-preview"
-              />
+              <select
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800 mb-2"
+                value={["gpt-realtime","gpt-4o-realtime-preview"].includes((config.openaiRealtimeModel || "").toLowerCase()) ? (config.openaiRealtimeModel || "").toLowerCase() : "custom"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "custom") {
+                    updateConfig({ openaiRealtimeModel: config.openaiRealtimeModel || "" });
+                  } else {
+                    updateConfig({ openaiRealtimeModel: v });
+                  }
+                }}
+              >
+                <option value="gpt-realtime">gpt-realtime (default)</option>
+                <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
+                <option value="custom">Custom…</option>
+              </select>
+              {
+                !["gpt-realtime","gpt-4o-realtime-preview"].includes((config.openaiRealtimeModel || "").toLowerCase()) && (
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                    value={config.openaiRealtimeModel || ""}
+                    onChange={(e) => updateConfig({ openaiRealtimeModel: e.target.value })}
+                    placeholder="Enter a custom realtime model"
+                  />
+                )
+              }
             </div>
 
             <label className="flex items-center gap-2 mb-1">
@@ -556,6 +599,18 @@ export default function Settings() {
                 <option value="1024x1024">1024x1024</option>
                 <option value="2048x2048">2048x2048</option>
               </select>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">Realtime Ingest Mode</label>
+              <select
+                className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800"
+                value={(config.ingestMode || "text")}
+                onChange={(e) => updateConfig({ ingestMode: e.target.value })}
+              >
+                <option value="text">Text (input_text)</option>
+                <option value="image">Image (input_image via PNG screenshot)</option>
+              </select>
+              <div className="text-[11px] text-neutral-500 mt-1">Image mode renders the last ~15 lines of your note into a PNG and sends it with input_image.</div>
             </div>
           </>
         )}
